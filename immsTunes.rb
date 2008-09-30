@@ -34,8 +34,7 @@ class Tunes < DelegateClass(Appscript::Application)
   end
   
   def enqueue(track)
-    p = track.location.get
-    add p, :to => playlist
+    duplicate track, :to => playlist
   end
   
   def index(track)
