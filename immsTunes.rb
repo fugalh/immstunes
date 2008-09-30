@@ -6,10 +6,13 @@ require 'thread'
 require 'appscript'
 include Appscript
 
-DEBUG=(ARGV[0] == '-d')
 HOME = Pathname.new(ENV['HOME'])
 $log = Logger.new STDERR
 $log.datetime_format = "%Y-%m-%d %H:%M:%S "
+$log.level = Logger::WARN
+$log.level = Logger::INFO if ARGV.include?('-v')
+$log.level = Logger::DEBUG if ARGV.include?('-d')
+
 
 # iTunes isn't a valid class name and ITunes is tacky.
 class Tunes < DelegateClass(Appscript::Application)
@@ -42,9 +45,7 @@ class Tunes < DelegateClass(Appscript::Application)
     @tracks = file_tracks.get
   end
   def index(track)
-    i = @tracks.map{|t| t.location.get}.index(track.location.get)
-    $log.debug  i
-    i
+    @tracks.map{|t| t.location.get}.index(track.location.get)
   end
 end
 
@@ -65,15 +66,19 @@ class IMMS
     # add debug output on @sock.puts
     class << @sock
       def puts(str)
-        if DEBUG or not str =~ /^Playlist(Item)? /
+        if str =~ /^Playlist(Item)? /
           $log.debug "> #{str.strip}"
+        else
+          $log.info "> #{str.strip}"
         end
         super
       end
       def gets
         str = super
-        if DEBUG or not str =~ /^GetPlaylistItem /
+        if str =~ /^GetPlaylistItem /
           $log.debug "< #{str.strip}"
+        else
+          $log.info "< #{str.strip}"
         end
         str
       end
@@ -114,7 +119,7 @@ class IMMS
           @next = @tunes.enqueue(pos)
 
         when 'PlaylistChanged'
-          $log.error line
+          $log.warning line
           @tunes.refresh
           playlist_changed
 
@@ -183,7 +188,6 @@ Thread.new do
     imms.dispatch
   rescue
     $log.fatal $!
-    #retry
     exit
   end
 end
