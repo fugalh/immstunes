@@ -43,7 +43,7 @@ class Tunes < DelegateClass(Appscript::Application)
     if t
       t.index.get
     else
-      -1
+      nil
     end
   end
 end
