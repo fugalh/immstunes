@@ -37,9 +37,9 @@ class Tunes < DelegateClass(Appscript::Application)
     refresh
   end
   
-  def enqueue(pos)
-    t = tracks[pos].location.get
-    add t, :to => playlist
+  def enqueue(track)
+    p = track.location.get
+    add p, :to => playlist
   end
   
   def refresh
@@ -118,7 +118,7 @@ class IMMS
         when 'EnqueueNext'
           pos = line.split.last.to_i
           t = @tunes.tracks[pos]
-          if t.position.get != :missing_value and t.enabled.get and t.shufflable.get
+          if t.location.get != :missing_value and t.enabled.get and t.shufflable.get
             @next = @tunes.enqueue(t)
           else
             @sock.puts 'SelectNext'

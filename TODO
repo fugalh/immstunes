@@ -8,5 +8,4 @@ It probably starts iTunes when it's off, and should be fixed to not do that.
 
 Growl the ratings changes maybe?
 
-Skip over "ghost songs" (the location is blank - because the file is gone),
-disabled songs, and don't shuffle songs.
+Figure out what we should do on ResetSelection
