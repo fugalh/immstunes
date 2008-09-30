@@ -59,7 +59,7 @@ class IMMS
       fork do
         exec 'immsd'
       end
-      sleep 0.25
+      sleep 1
       retry
     end
 
@@ -89,7 +89,7 @@ class IMMS
     @sock.puts 'Version'
     version = @sock.gets.strip
     unless version == 'Version 2.1'
-      $log.warning "I'm not programmed for version #{version}" 
+      $log.warning "I'm not programmed for version #{version}. Strange things may happen!" 
     end
 
     @sock.puts 'IMMS'
@@ -116,7 +116,12 @@ class IMMS
 
         when 'EnqueueNext'
           pos = line.split.last.to_i
-          @next = @tunes.enqueue(pos)
+          t = @tunes.tracks[pos]
+          if t.position.get != :missing_value and t.enabled.get and t.shufflable.get
+            @next = @tunes.enqueue(t)
+          else
+            @sock.puts 'SelectNext'
+          end
 
         when 'PlaylistChanged'
           $log.warning line
@@ -159,6 +164,7 @@ class IMMS
 
             fin = false
             current_track = p
+
           else
             f = t.finish.get
             p = @tunes.player_position.get
