@@ -1,4 +1,4 @@
-immsTunes is a daemon that marries iTunes and IMMS[1]
+immsTunes is a daemon that marries iTunes and IMMS[1] on OS X.
 
 Requires Ruby, rb-appscript[2], IMMS and iTunes. You probably already have Ruby
 and iTunes.
@@ -14,6 +14,8 @@ As long as immsTunes is running, it will learn from your listening habits. If
 you want it to control your playlist, put iTunes in Party Shuffle and set the
 upcoming tracks to 0 (if you have upcoming tracks to any other value, Party
 Shuffle will work as it always did, without consulting IMMS).
+
+Distributed under the same license as Ruby.
 
 1. http://www.luminal.org/wiki/index.php/IMMS
 2. http://appscript.sourceforge.net/rb-appscript/index.html
