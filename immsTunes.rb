@@ -1,13 +1,15 @@
 require 'rubygems' rescue nil
 require 'socket'
 require 'pathname'
-require 'appscript'
 require 'logger'
+require 'thread'
+require 'appscript'
 include Appscript
 
+DEBUG=(ARGV[0] == '-d')
 HOME = Pathname.new(ENV['HOME'])
 $log = Logger.new STDERR
-$log.datetime_format = "%Y-%m-%d %H:%M:%S%Z"
+$log.datetime_format = "%Y-%m-%d %H:%M:%S "
 
 # iTunes isn't a valid class name and ITunes is tacky.
 class Tunes < DelegateClass(Appscript::Application)
@@ -17,6 +19,9 @@ class Tunes < DelegateClass(Appscript::Application)
   # The playlist we manage, e.g. Party Shuffle
   attr :playlist
 
+  # The list of tracks - NB the indexing is not the same as iTunes'
+  attr :tracks
+
   def initialize
     @app = app('iTunes')
     super(@app)
@@ -24,18 +29,22 @@ class Tunes < DelegateClass(Appscript::Application)
     @playlist = @app.playlists[its.special_kind.eq(:Party_Shuffle)].first.get
     @library = @app.library_playlists.first.get
 
-    fixed_indexing.set true
+    #fixed_indexing.set true
+    refresh
   end
   
   def enqueue(pos)
-    t = library.file_tracks[pos].get
-    playlist.add t
+    t = tracks[pos].location.get
+    add t, :to => playlist
   end
   
-  # This is depressingly inefficient
-  def track_by_location(loc)
-    loc = MacTypes::Alias.path(loc)
-    library.file_tracks.get.find{|t| t.location.get == loc}
+  def refresh
+    @tracks = file_tracks.get
+  end
+  def index(track)
+    i = @tracks.map{|t| t.location.get}.index(track.location.get)
+    $log.debug  i
+    i
   end
 end
 
@@ -56,15 +65,21 @@ class IMMS
     # add debug output on @sock.puts
     class << @sock
       def puts(str)
-        $log.debug "> #{str.strip}"
+        if DEBUG or not str =~ /^Playlist(Item)? /
+          $log.debug "> #{str.strip}"
+        end
         super
       end
       def gets
         str = super
-        $log.debug "< #{str.strip}"
+        if DEBUG or not str =~ /^GetPlaylistItem /
+          $log.debug "< #{str.strip}"
+        end
         str
       end
     end
+
+    @mutex = Mutex.new
 
     @sock.puts 'Version'
     version = @sock.gets.strip
@@ -73,74 +88,89 @@ class IMMS
     end
 
     @sock.puts 'IMMS'
+    @sock.puts 'Setup 0'
+    playlist_changed
+  end
+
+  def playlist_changed
+    @sock.puts "PlaylistChanged #{@tunes.tracks.size}"
   end
 
   def dispatch
     until @sock.eof do
       line = @sock.gets.strip
 
-      cmd = line.split.first
-      case cmd
-      when 'ResetSelection'
-        # noop
+      @mutex.synchronize {
+        cmd = line.split.first
+        case cmd
+        when 'ResetSelection'
+          # noop
 
-      when 'TryAgain'
-        @sock.puts 'SelectNext'
+        when 'TryAgain'
+          @sock.puts 'SelectNext'
 
-      when 'EnqueueNext'
-        pos = line.split.last.to_i
-        @tunes.enqueue pos
+        when 'EnqueueNext'
+          pos = line.split.last.to_i
+          @next = @tunes.enqueue(pos)
 
-      when 'PlaylistChanged'
-        $log.error line
-        len = line.split.last
-        @sock.puts "PlaylistChanged #{len}"
+        when 'PlaylistChanged'
+          $log.error line
+          @tunes.refresh
+          playlist_changed
 
-      when 'GetPlaylistItem'
-        pos = line.split.last.to_i
-        path = @tunes.library.file_tracks[pos].location.get
-        @sock.puts "PlaylistItem #{pos} #{path}"
+        when 'GetPlaylistItem'
+          pos = line.split.last.to_i
+          path = @tunes.tracks[pos].location.get
+          @sock.puts "PlaylistItem #{pos} #{path}"
 
-      when 'GetEntirePlaylist'
-        @tunes.library.file_tracks.get.each_with_index do |track, pos|
-          path = track.location.get 
-          @sock.puts "Playlist #{pos} #{path}"
+        when 'GetEntirePlaylist'
+          @tunes.tracks.each_with_index do |track, pos|
+            path = track.location.get 
+            @sock.puts "Playlist #{pos} #{path}"
+          end
+          @sock.puts "PlaylistEnd"
+
+        else
+          $log.error "Unknown Command '#{line}'"
         end
-        @sock.puts "PlaylistEnd"
-
-      else
-        $log.error "Unknown Command '#{line}'"
-      end
+      }
     end
   end
 
   def control
-    current_track = nil
+    current_track = @tunes.current_track.location.get
     fin = false
     loop do
-      # Observe listening behavior
-      if @tunes.player_state.get == :playing and not @tunes.mute.get
+      @mutex.synchronize {
+        # Observe listening behavior
         t = @tunes.current_track
-        p = t.location.get
-        if p != current_track
-          unless fin
-            @sock.puts "EndSong 0 0 0"
-          end
-          @sock.puts "StartSong #{p}"
+        if @tunes.player_state.get == :playing and not @tunes.mute.get
+          p = t.location.get
+          if p != current_track
+            unless fin
+              @sock.puts "EndSong 0 0 0"
+            end
+            @sock.puts "StartSong #{@tunes.index(t)} #{p}"
 
-          fin = false
-          current_track = p
-        else
-          if not fin and (t.finish.get - @tunes.player_position.get) < 5
-            @sock.puts "EndSong 1 0 0"
-            fin = true
+            fin = false
+            current_track = p
+          else
+            f = t.finish.get
+            p = @tunes.player_position.get
+            if not fin and (f - p) < 5
+              @sock.puts "EndSong 1 0 0"
+              fin = true
+            end
           end
         end
-      end
 
-      # Control playlist
-      if @tunes.current_playlist.persistent_ID.get == @tunes.playlist.persistent_ID.get
-      end
+        # Control playlist
+        if @tunes.current_playlist.persistent_ID.get == @tunes.playlist.persistent_ID.get
+          l = @tunes.playlist.tracks.get.size
+          p = t.index.get
+          @sock.puts "SelectNext" if p == l
+        end
+      }
 
       sleep 1
     end
@@ -149,7 +179,14 @@ end
 
 imms = IMMS.new
 Thread.new do
-  imms.dispatch
+  begin
+    imms.dispatch
+  rescue
+    $log.fatal $!
+    #retry
+    exit
+  end
 end
 imms.control
 
+# TODO jumped?
