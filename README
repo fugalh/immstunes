@@ -1,0 +1,20 @@
+immsTunes is a daemon that marries iTunes and IMMS[1]
+
+Requires Ruby, rb-appscript[2], IMMS and iTunes. You probably already have Ruby
+and iTunes.
+
+Building IMMS on OS X is presently painful. I document the process on my blog[3]
+(ignore all the rambling about Audacious). Hopefully this will soon be remedied.
+
+Run it in the background, e.g.
+
+    screen ./immsTunes.rb -v
+
+As long as immsTunes is running, it will learn from your listening habits. If
+you want it to control your playlist, put iTunes in Party Shuffle and set the
+upcoming tracks to 0 (if you have upcoming tracks to any other value, Party
+Shuffle will work as it always did, without consulting IMMS).
+
+1. http://www.luminal.org/wiki/index.php/IMMS
+2. http://appscript.sourceforge.net/rb-appscript/index.html
+3. http://hans.fugal.net/blog/2008/09/19/imms

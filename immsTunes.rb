@@ -193,4 +193,4 @@ Thread.new do
 end
 imms.control
 
-# TODO jumped?
+# This file is distributed under the Ruby License (http://www.ruby-lang.org/en/LICENSE.txt)
