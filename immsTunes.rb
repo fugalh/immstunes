@@ -149,7 +149,7 @@ class IMMS
   end
 
   def control
-    current_track = @tunes.current_track.location.get
+    current_track = nil
     fin = false
     loop do
       @mutex.synchronize {
@@ -158,7 +158,7 @@ class IMMS
         if @tunes.player_state.get == :playing and not @tunes.mute.get
           p = t.location.get
           if p != current_track
-            unless fin
+            if not fin and current_track
               @sock.puts "EndSong 0 0 0"
             end
             @sock.puts "StartSong #{@tunes.index(t)} #{p}"
