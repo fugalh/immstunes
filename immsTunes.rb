@@ -117,7 +117,7 @@ class IMMS
           t = @tunes.tracks[pos]
           
           if loc(t) != :missing_value and t.enabled.get and t.shufflable.get
-            @next = @tunes.enqueue(t)
+            @next = loc(@tunes.enqueue(t))
           else
             @sock.puts 'SelectNext'
           end
@@ -130,13 +130,13 @@ class IMMS
           pos = line.split.last.to_i+1
           t = @tunes.tracks[pos]
           path = loc(t)
-          @sock.puts "PlaylistItem #{pos} #{path}"
+          @sock.puts "PlaylistItem #{pos-1} #{path}"
 
         when 'GetEntirePlaylist'
           @tunes.tracks.get.each do |track|
             path = loc(track)
             pos = track.index.get
-            @sock.puts "Playlist #{pos} #{path}"
+            @sock.puts "Playlist #{pos-1} #{path}"
           end
           @sock.puts "PlaylistEnd"
 
@@ -153,20 +153,24 @@ class IMMS
     # If we happen to play a song not in the library playlist, we'll not tell
     # IMMS about it. (off the record)
     otr = false
+    jumped = false
     loop do
       @mutex.synchronize {
         # Observe listening behavior
         t = @tunes.current_track
         if @tunes.player_state.get == :playing and not @tunes.mute.get
+
+          # advance
           p = loc(t)
           if p != current_track
             if not fin and current_track
-              @sock.puts "EndSong 0 0 0" unless otr
+              @sock.puts "EndSong 0 #{jumped ? 1 : 0} 0" unless otr
             end
             i = @tunes.index(t)
             otr = i.nil?
-            @sock.puts "StartSong #{i} #{p}" unless otr
+            @sock.puts "StartSong #{i-1} #{p}" unless otr
 
+            jumped = (p != @next)
             fin = false
             current_track = p
 
@@ -174,9 +178,10 @@ class IMMS
             f = t.finish.get
             p = @tunes.player_position.get
             if not fin and (f - p) < 5
-              @sock.puts "EndSong 1 0 0" unless otr
+              @sock.puts "EndSong 1 #{jumped ? 1 : 0} 0" unless otr
               fin = true
             end
+
           end
         end
 
