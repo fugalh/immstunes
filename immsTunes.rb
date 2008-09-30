@@ -23,9 +23,6 @@ class Tunes < DelegateClass(Appscript::Application)
   # The playlist we manage, e.g. Party Shuffle
   attr :playlist
 
-  # The list of tracks - NB the indexing is not the same as iTunes'
-  attr :tracks
-
   def initialize
     @app = app('iTunes')
     super(@app)
@@ -33,8 +30,7 @@ class Tunes < DelegateClass(Appscript::Application)
     @playlist = @app.playlists[its.special_kind.eq(:Party_Shuffle)].first.get
     @library = @app.library_playlists.first.get
 
-    #fixed_indexing.set true
-    refresh
+    fixed_indexing.set true
   end
   
   def enqueue(track)
@@ -42,11 +38,13 @@ class Tunes < DelegateClass(Appscript::Application)
     add p, :to => playlist
   end
   
-  def refresh
-    @tracks = file_tracks.get
-  end
   def index(track)
-    @tracks.map{|t| t.location.get}.index(track.location.get)
+    t = tracks[its.persistent_ID.eq(track.persistent_ID.get)].get.first
+    if t
+      t.index.get
+    else
+      -1
+    end
   end
 end
 
@@ -90,7 +88,7 @@ class IMMS
     @sock.puts 'Version'
     version = @sock.gets.strip
     unless version == 'Version 2.1'
-      $log.warning "I'm not programmed for version #{version}. Strange things may happen!" 
+      $log.warn "I'm not programmed for version #{version}. Strange things may happen!" 
     end
 
     @sock.puts 'IMMS'
@@ -99,7 +97,7 @@ class IMMS
   end
 
   def playlist_changed
-    @sock.puts "PlaylistChanged #{@tunes.tracks.size}"
+    @sock.puts "PlaylistChanged #{@tunes.tracks.last.index.get}"
   end
 
   def dispatch
@@ -116,7 +114,7 @@ class IMMS
           @sock.puts 'SelectNext'
 
         when 'EnqueueNext'
-          pos = line.split.last.to_i
+          pos = line.split.last.to_i+1
           t = @tunes.tracks[pos]
           if t.location.get != :missing_value and t.enabled.get and t.shufflable.get
             @next = @tunes.enqueue(t)
@@ -125,18 +123,27 @@ class IMMS
           end
 
         when 'PlaylistChanged'
-          $log.warning line
-          @tunes.refresh
+          $log.warn line
           playlist_changed
 
         when 'GetPlaylistItem'
-          pos = line.split.last.to_i
-          path = @tunes.tracks[pos].location.get
+          pos = line.split.last.to_i+1
+          t = @tunes.tracks[pos]
+          if t.properties.include?('location')
+            path = t.location.get
+          else
+            path = t.name.get
+          end
           @sock.puts "PlaylistItem #{pos} #{path}"
 
         when 'GetEntirePlaylist'
-          @tunes.tracks.each_with_index do |track, pos|
-            path = track.location.get 
+          @tunes.tracks.get.each do |track|
+            begin
+              path = track.location.get 
+            rescue
+              path = track.name.get
+            end
+            pos = track.index.get
             @sock.puts "Playlist #{pos} #{path}"
           end
           @sock.puts "PlaylistEnd"
@@ -151,6 +158,9 @@ class IMMS
   def control
     current_track = nil
     fin = false
+    # If we happen to play a song not in the library playlist, we'll not tell
+    # IMMS about it. (off the record)
+    otr = false
     loop do
       @mutex.synchronize {
         # Observe listening behavior
@@ -159,9 +169,11 @@ class IMMS
           p = t.location.get
           if p != current_track
             if not fin and current_track
-              @sock.puts "EndSong 0 0 0"
+              @sock.puts "EndSong 0 0 0" unless otr
             end
-            @sock.puts "StartSong #{@tunes.index(t)} #{p}"
+            i = @tunes.index(t)
+            otr = i.nil?
+            @sock.puts "StartSong #{i} #{p}" unless otr
 
             fin = false
             current_track = p
@@ -170,7 +182,7 @@ class IMMS
             f = t.finish.get
             p = @tunes.player_position.get
             if not fin and (f - p) < 5
-              @sock.puts "EndSong 1 0 0"
+              @sock.puts "EndSong 1 0 0" unless otr
               fin = true
             end
           end
