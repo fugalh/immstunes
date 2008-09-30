@@ -107,7 +107,10 @@ class IMMS
         cmd = line.split.first
         case cmd
         when 'ResetSelection'
-          # noop
+          l = @tunes.playlist.tracks.last
+          if loc(l) == @next and @tunes.current_track.index.get != l.index.get
+            @tunes.playlist.delete l
+          end
 
         when 'TryAgain'
           @sock.puts 'SelectNext'
@@ -158,7 +161,8 @@ class IMMS
       @mutex.synchronize {
         # Observe listening behavior
         t = @tunes.current_track
-        if @tunes.player_state.get == :playing and not @tunes.mute.get
+        playing = (@tunes.player_state.get == :playing)
+        if playing and not @tunes.mute.get
 
           # advance
           p = loc(t)
@@ -170,7 +174,7 @@ class IMMS
             otr = i.nil?
             @sock.puts "StartSong #{i-1} #{p}" unless otr
 
-            jumped = (p != @next)
+            jumped = (p != @next) and @tunes.current_playlist.get == @tunes.playlist.get
             fin = false
             current_track = p
 
@@ -186,7 +190,7 @@ class IMMS
         end
 
         # Control playlist
-        if @tunes.current_playlist.persistent_ID.get == @tunes.playlist.persistent_ID.get
+        if playing and @tunes.current_playlist.persistent_ID.get == @tunes.playlist.persistent_ID.get
           l = @tunes.playlist.tracks.get.size
           p = t.index.get
           @sock.puts "SelectNext" if p == l
