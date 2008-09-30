@@ -3,26 +3,37 @@ require 'socket'
 require 'pathname'
 require 'appscript'
 require 'logger'
-include Appscript
 
 HOME = Pathname.new(ENV['HOME'])
-iTunes = app('iTunes')
-party_shuffle = iTunes.playlists[its.special_kind.eq(:Party_Shuffle)].first.get
-imms = nil
-begin
-  imms = UNIXSocket.open(HOME + '.imms' + 'socket')
-rescue Errno::ECONNREFUSED
-  fork do 
-    exec 'immsd'
-  end
-  sleep 0.25
-  retry
-end
-log = Logger.new STDERR
+$log = Logger.new STDERR
 
-imms.puts 'Version'
-version = imms.gets.strip
-unless version == 'Version 2.1'
-  log.warning "I'm not programmed for version #{version}" 
+class IMMS
+  def initialize
+    begin
+      @sock = UNIXSocket.open(HOME + '.imms' + 'socket')
+    rescue Errno::ECONNREFUSED
+      fork do
+        exec 'immsd'
+      end
+      sleep 0.25
+      retry
+    end
+
+    @sock.puts 'Version'
+    version = @sock.gets.strip
+    unless version == 'Version 2.1'
+      $log.warning "I'm not programmed for version #{version}" 
+    end
+  end
 end
-puts version
+
+class Tunes
+  include Appscript
+  def initialize
+    @app = app('iTunes')
+    @playlist = @app.playlists[its.special_kind.eq(:Party_Shuffle)].first.get
+  end
+end
+
+imms = IMMS.new
+tunes = Tunes.new
