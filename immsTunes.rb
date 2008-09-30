@@ -1,3 +1,4 @@
+#!/usr/bin/env ruby
 require 'rubygems' rescue nil
 require 'socket'
 require 'pathname'
