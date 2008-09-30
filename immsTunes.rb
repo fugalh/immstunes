@@ -115,7 +115,8 @@ class IMMS
         when 'EnqueueNext'
           pos = line.split.last.to_i+1
           t = @tunes.tracks[pos]
-          if t.location.get != :missing_value and t.enabled.get and t.shufflable.get
+          
+          if loc(t) != :missing_value and t.enabled.get and t.shufflable.get
             @next = @tunes.enqueue(t)
           else
             @sock.puts 'SelectNext'
@@ -128,20 +129,12 @@ class IMMS
         when 'GetPlaylistItem'
           pos = line.split.last.to_i+1
           t = @tunes.tracks[pos]
-          if t.properties.include?('location')
-            path = t.location.get
-          else
-            path = t.name.get
-          end
+          path = loc(t)
           @sock.puts "PlaylistItem #{pos} #{path}"
 
         when 'GetEntirePlaylist'
           @tunes.tracks.get.each do |track|
-            begin
-              path = track.location.get 
-            rescue
-              path = track.name.get
-            end
+            path = loc(track)
             pos = track.index.get
             @sock.puts "Playlist #{pos} #{path}"
           end
@@ -165,7 +158,7 @@ class IMMS
         # Observe listening behavior
         t = @tunes.current_track
         if @tunes.player_state.get == :playing and not @tunes.mute.get
-          p = t.location.get
+          p = loc(t)
           if p != current_track
             if not fin and current_track
               @sock.puts "EndSong 0 0 0" unless otr
@@ -196,6 +189,14 @@ class IMMS
       }
 
       sleep 1
+    end
+  end
+
+  def loc(track)
+    begin
+      track.location.get
+    rescue Appscript::CommandError
+      track.name.get
     end
   end
 end
