@@ -3,8 +3,8 @@ immsTunes is a daemon that marries iTunes and IMMS[1] on OS X.
 Requires Ruby, rb-appscript[2], IMMS and iTunes. You probably already have Ruby
 and iTunes.
 
-Building IMMS on OS X is presently painful. I document the process on my blog[3]
-(ignore all the rambling about Audacious). Hopefully this will soon be remedied.
+To build IMMS, download and extract the 3.1.0-rc4 tarball, then apply the
+imms-3.1.0-rc4.diff patch included with immsTunes.
 
 Run it in the background, e.g.
 
