@@ -18,7 +18,10 @@ IO.popen("tail -f -q -n 1 #{HOME + '.imms' + 'imms.log'}", 'r') { |f|
       flags = $3.tr('[]','').strip
       after = $4
       msg = "#{last} #{before} → #{after}\n#{flags}"
-      system 'growlnotify', '-m', msg, '-d', 'imms.log', '-p', '-2', '-n', 'IMMS', '--image', Image.to_s, '-w'
+      fork do 
+        exec('growlnotify', '-m', msg, '-d', 'imms.log', '-p', '-2', '-n',
+               'IMMS', '--image', Image.to_s, '-w')
+      end
       state = 0
     end
   end
