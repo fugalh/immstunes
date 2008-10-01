@@ -1,12 +1,12 @@
 Index: imms-3.1.0-rc4/Makefile
 ===================================================================
---- imms-3.1.0-rc4.orig/Makefile	2008-10-01 07:11:44.000000000 -0600
-+++ imms-3.1.0-rc4/Makefile	2008-10-01 07:11:54.000000000 -0600
+--- imms-3.1.0-rc4.orig/Makefile	2008-10-01 11:23:17.000000000 -0600
++++ imms-3.1.0-rc4/Makefile	2008-10-01 11:24:54.000000000 -0600
 @@ -9,6 +9,7 @@ configure: configure.ac
  	autoheader
  	aclocal
  	autoconf
-+	[ -x config.status ] && ./config.status --recheck
++	[ ! -x config.status ] || ./config.status --recheck
  
  immsconf.h: configure
  	$(error Please run the "configure" script)
@@ -21,8 +21,8 @@ Index: imms-3.1.0-rc4/Makefile
  %:
 Index: imms-3.1.0-rc4/immsd/immsd.cc
 ===================================================================
---- imms-3.1.0-rc4.orig/immsd/immsd.cc	2008-10-01 07:11:44.000000000 -0600
-+++ imms-3.1.0-rc4/immsd/immsd.cc	2008-10-01 07:11:54.000000000 -0600
+--- imms-3.1.0-rc4.orig/immsd/immsd.cc	2008-10-01 11:23:17.000000000 -0600
++++ imms-3.1.0-rc4/immsd/immsd.cc	2008-10-01 11:25:28.000000000 -0600
 @@ -2,6 +2,7 @@
  #include <errno.h>
  #include <signal.h>
@@ -42,8 +42,8 @@ Index: imms-3.1.0-rc4/immsd/immsd.cc
      g_source_attach(ts, NULL);
 Index: imms-3.1.0-rc4/configure.ac
 ===================================================================
---- imms-3.1.0-rc4.orig/configure.ac	2008-10-01 07:11:44.000000000 -0600
-+++ imms-3.1.0-rc4/configure.ac	2008-10-01 07:11:54.000000000 -0600
+--- imms-3.1.0-rc4.orig/configure.ac	2008-10-01 11:23:17.000000000 -0600
++++ imms-3.1.0-rc4/configure.ac	2008-10-01 11:25:28.000000000 -0600
 @@ -68,6 +68,22 @@ else
      AC_MSG_RESULT([yes])
  fi
@@ -102,8 +102,8 @@ Index: imms-3.1.0-rc4/configure.ac
      AC_MSG_CHECKING(for object target)
 Index: imms-3.1.0-rc4/rules.mk
 ===================================================================
---- imms-3.1.0-rc4.orig/rules.mk	2008-10-01 07:11:43.000000000 -0600
-+++ imms-3.1.0-rc4/rules.mk	2008-10-01 07:12:16.000000000 -0600
+--- imms-3.1.0-rc4.orig/rules.mk	2008-10-01 11:23:17.000000000 -0600
++++ imms-3.1.0-rc4/rules.mk	2008-10-01 11:25:28.000000000 -0600
 @@ -14,12 +14,11 @@ link = $(CXX) $(filter-out %.a,$1) $(fil
  %.o: %.c; $(call compile, $(CC), $<, $@, $($*-CFLAGS) $(CFLAGS) $($*-CPPFLAGS) $(CPPFLAGS))
  %: %.o; $(call link, $^ $($*-OBJ) $(LIBS), $@, $($*-LIBS) $(LDFLAGS))
@@ -122,8 +122,8 @@ Index: imms-3.1.0-rc4/rules.mk
  objects=$(sort $(notdir $(foreach type,c cc,$(call objects_$(type),$1))))
 Index: imms-3.1.0-rc4/vars.mk.in
 ===================================================================
---- imms-3.1.0-rc4.orig/vars.mk.in	2008-10-01 07:11:43.000000000 -0600
-+++ imms-3.1.0-rc4/vars.mk.in	2008-10-01 07:11:54.000000000 -0600
+--- imms-3.1.0-rc4.orig/vars.mk.in	2008-10-01 11:23:17.000000000 -0600
++++ imms-3.1.0-rc4/vars.mk.in	2008-10-01 11:25:28.000000000 -0600
 @@ -4,6 +4,8 @@ VERSION = @PACKAGE_VERSION@
  INSTALL = @INSTALL@
  prefix = @prefix@
@@ -135,8 +135,8 @@ Index: imms-3.1.0-rc4/vars.mk.in
  exec_prefix = @exec_prefix@
 Index: imms-3.1.0-rc4/immscore/immsutil.cc
 ===================================================================
---- imms-3.1.0-rc4.orig/immscore/immsutil.cc	2008-10-01 07:11:43.000000000 -0600
-+++ imms-3.1.0-rc4/immscore/immsutil.cc	2008-10-01 07:11:54.000000000 -0600
+--- imms-3.1.0-rc4.orig/immscore/immsutil.cc	2008-10-01 11:23:17.000000000 -0600
++++ imms-3.1.0-rc4/immscore/immsutil.cc	2008-10-01 11:25:28.000000000 -0600
 @@ -27,6 +27,7 @@ int imms_random(int max)
  {
      int rand_num;
@@ -163,7 +163,7 @@ Index: imms-3.1.0-rc4/immscore/immsutil.cc
 Index: imms-3.1.0-rc4/clients/audacious/audaciousinterface.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ imms-3.1.0-rc4/clients/audacious/audaciousinterface.c	2008-10-01 07:11:54.000000000 -0600
++++ imms-3.1.0-rc4/clients/audacious/audaciousinterface.c	2008-10-01 11:25:28.000000000 -0600
 @@ -0,0 +1,177 @@
 +#include <gtk/gtk.h>
 +
@@ -344,8 +344,8 @@ Index: imms-3.1.0-rc4/clients/audacious/audaciousinterface.c
 +}
 Index: imms-3.1.0-rc4/clients/audacious/rules.mk
 ===================================================================
---- imms-3.1.0-rc4.orig/clients/audacious/rules.mk	2008-10-01 07:11:43.000000000 -0600
-+++ imms-3.1.0-rc4/clients/audacious/rules.mk	2008-10-01 07:11:54.000000000 -0600
+--- imms-3.1.0-rc4.orig/clients/audacious/rules.mk	2008-10-01 11:23:17.000000000 -0600
++++ imms-3.1.0-rc4/clients/audacious/rules.mk	2008-10-01 11:25:28.000000000 -0600
 @@ -7,15 +7,15 @@ libaudaciousimms-LIBS = $(AUDACIOUSLDFLA
  audaciousinterface-CPPFLAGS=$(AUDACIOUSCPPFLAGS)
  audplugin-CPPFLAGS=$(AUDACIOUSCPPFLAGS)
