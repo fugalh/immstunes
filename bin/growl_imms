@@ -1,0 +1,36 @@
+#! /usr/bin/env ruby
+require 'pathname'
+require 'rbconfig'
+
+# Find the image in datadir (if installed) or `dirname $0`/data/imms (if not)
+image = Pathname.new(Config::CONFIG['datadir']) + 'imms' + 'm.png'
+if not image.exist?
+  image = Pathname.new($0).dirname + 'data' + 'imms' + 'm.png'
+end
+
+verbose = ARGV.include? '-v'
+if ARGV.include? '-h'
+  puts "usage: #{$0} [-v]"
+  exit
+end
+
+IO.popen("tail -f -q -n 1 #{Pathname.new(ENV['HOME']) + '.imms' + 'imms.log'}", 'r') { |f|
+  f.each_line do |l|
+    puts l if verbose
+
+    if l =~ /Rating: ([^\]]+).*Last: ([^\]]+)(.*)After: ([^\]]+)/
+      before = $1
+      last = $2
+      flags = $3.tr('[]','').strip
+      after = $4
+      msg = "#{last} #{before} → #{after}\n#{flags}"
+
+      # growlnotify has a bug that prevents it from working sometimes, but the
+      # -w flag is a workaround. We don't want to actually wait, so we spawn.
+      fork do 
+        exec('growlnotify', '-m', msg, '-d', 'imms.log', '-p', '-2', '-n',
+               'IMMS', '--image', Image.to_s, '-w')
+      end
+    end
+  end
+}

@@ -6,24 +6,28 @@ and iTunes.
 To build IMMS, download and extract the 3.1.0-rc4 tarball, then apply the
 imms-3.1.0-rc4.diff patch included with immsTunes.
 
-Run it in the background, e.g.
+Install with
 
-    screen ./immsTunes.rb -v
+    sudo make install
+
+Run it in the background, e.g. using screen:
+
+    screen immsTunes -v
 
 As long as immsTunes is running, it will learn from your listening habits. If
-you want it to control your playlist, put iTunes in Party Shuffle and set the
-upcoming tracks to 0 (if you have upcoming tracks to any other value, Party
-Shuffle will work as it always did, without consulting IMMS).
+you want it to control your playlist, put iTunes in Party Shuffle and set
+"Display Upcoming Tracks" to 0 (if you set it to any other value, Party Shuffle
+will work as it always did, without consulting IMMS).
 
 immsTunes accepts -q for quiet operation (warnings and errors only), -v for
 verbose operation (echo most commands to/from the server) and -d for debug
 (echo everything to/from server).
 
-growl_imms.rb is a simple daemon that watches your IMMS log and growls the
+growl_imms is a simple daemon that watches your IMMS log and growls the
 before/after ratings. It's always interesting to see how the ratings are
 changing, especially when you first start using IMMS.
 
-    ./growl_imms.rb &
+    growl_imms &
 
 Distributed under the same license as Ruby.
 
