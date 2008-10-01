@@ -135,6 +135,7 @@ class IMMS
           
           if loc(t) != :missing_value and t.enabled.get and t.shufflable.get
             @next = loc(@tunes.enqueue(t))
+            $log.debug "upcoming: #{t.name.get}"
           else
             @sock.puts 'SelectNext'
           end
