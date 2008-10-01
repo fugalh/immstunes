@@ -1,11 +1,5 @@
-[Jumped]
-
 It'd sure be nice to get events from iTunes instead of polling. Is this
 possible? We'd need next song notification with some indication as to whether
 the previous song was skipped, and I think that's it.
 
 It probably starts iTunes when it's off, and should be fixed to not do that.
-
-Growl the ratings changes maybe?
-
-Figure out what we should do on ResetSelection
