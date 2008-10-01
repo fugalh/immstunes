@@ -94,7 +94,7 @@ class IMMS
       @sock = UNIXSocket.open(HOME + '.imms' + 'socket')
     rescue Errno::ECONNREFUSED
       fork do
-        exec 'immsd'
+        exec 'nice -n 5 immsd'
       end
       sleep 1
       retry
