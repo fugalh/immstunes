@@ -15,6 +15,10 @@ you want it to control your playlist, put iTunes in Party Shuffle and set the
 upcoming tracks to 0 (if you have upcoming tracks to any other value, Party
 Shuffle will work as it always did, without consulting IMMS).
 
+immsTunes accepts -q for quiet operation (warnings and errors only), -v for
+verbose operation (echo most commands to/from the server) and -d for debug
+(echo everything to/from server).
+
 growl_imms.rb is a simple daemon that watches your IMMS log and growls the
 before/after ratings. It's always interesting to see how the ratings are
 changing, especially when you first start using IMMS.

@@ -10,9 +10,10 @@ include Appscript
 HOME = Pathname.new(ENV['HOME'])
 $log = Logger.new STDERR
 $log.datetime_format = "%Y-%m-%d %H:%M:%S "
-$log.level = Logger::WARN
-$log.level = Logger::INFO if ARGV.include?('-v')
-$log.level = Logger::DEBUG if ARGV.include?('-d')
+$log.level = Logger::INFO
+$log.level = Logger::WARN if ARGV.include?('-q')
+$log.level = Logger::DEBUG if ARGV.include?('-v')
+DEBUG = ARGV.include?('-d')
 
 
 # iTunes isn't a valid class name and ITunes is tacky.
@@ -24,6 +25,9 @@ class Tunes < DelegateClass(Appscript::Application)
   attr :playlist
 
   def initialize
+    @system = app('System Events')
+    wait
+
     @app = app('iTunes')
     super(@app)
 
@@ -45,12 +49,28 @@ class Tunes < DelegateClass(Appscript::Application)
       nil
     end
   end
+
+  def running
+    @system.processes.name.get.include? 'iTunes'
+  end
+
+  def wait
+    until running
+      sleep 5
+    end
+  end
+
+  def track_count
+    @library.count(:each => :track)
+  end
 end
 
 class IMMS
   def initialize
+    $log.info 'Connecting to iTunes'
     @tunes = Tunes.new
 
+    $log.info 'Connecting to immsd'
     begin
       @sock = UNIXSocket.open(HOME + '.imms' + 'socket')
     rescue Errno::ECONNREFUSED
@@ -64,20 +84,12 @@ class IMMS
     # add debug output on @sock.puts
     class << @sock
       def puts(str)
-        if str =~ /^Playlist(Item)? /
-          $log.debug "> #{str.strip}"
-        else
-          $log.info "> #{str.strip}"
-        end
+        $log.debug "> #{str.strip}" if DEBUG or not str =~ /^Playlist(Item)? /
         super
       end
       def gets
         str = super
-        if str =~ /^GetPlaylistItem /
-          $log.debug "< #{str.strip}"
-        else
-          $log.info "< #{str.strip}"
-        end
+        $log.debug "< #{str.strip}" if DEBUG or not str =~ /^GetPlaylistItem /
         str
       end
     end
@@ -96,12 +108,14 @@ class IMMS
   end
 
   def playlist_changed
-    @sock.puts "PlaylistChanged #{@tunes.tracks.last.index.get}"
+    @sock.puts "PlaylistChanged #{@tunes.track_count}"
   end
 
   def dispatch
     until @sock.eof do
       line = @sock.gets.strip
+      
+      @tunes.wait
 
       @mutex.synchronize {
         cmd = line.split.first
@@ -126,7 +140,7 @@ class IMMS
           end
 
         when 'PlaylistChanged'
-          $log.warn line
+          $log.warn 'immsd detected playlist change'
           playlist_changed
 
         when 'GetPlaylistItem'
@@ -136,6 +150,7 @@ class IMMS
           @sock.puts "PlaylistItem #{pos-1} #{path}"
 
         when 'GetEntirePlaylist'
+          $log.info 'Sending entire playlist'
           @tunes.tracks.get.each do |track|
             path = loc(track)
             pos = track.index.get
@@ -158,6 +173,8 @@ class IMMS
     otr = false
     jumped = false
     loop do
+      @tunes.wait
+
       @mutex.synchronize {
         # Observe listening behavior
         t = @tunes.current_track
