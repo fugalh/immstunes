@@ -154,6 +154,7 @@ class IMMS
           if loc(t) != :missing_value and t.enabled.get and t.shufflable.get
             @next = @tunes.enqueue(t).get
             $log.debug "upcoming: #{t.name.get}"
+            @waiting_for_next = false
           else
             @sock.puts 'SelectNext'
           end
@@ -194,6 +195,7 @@ class IMMS
   # Observe iTunes and send stuff to the server
   def control
     current_track = nil
+    plays = 0
     fin = false
     # If we happen to play a song not in the library playlist, we'll not tell
     # IMMS about it. (off the record)
@@ -205,44 +207,49 @@ class IMMS
       @mutex.synchronize {
         # Observe listening behavior
 
-        t = @tunes.current_track.get rescue next
         playing = (@tunes.player_state.get == :playing)
-        controlling = @tunes.current_playlist.persistent_ID.get == @tunes.playlist.persistent_ID.get
 
-        if playing and not @tunes.mute.get
-          # advanced?
-          p = loc(t)
-          if p != current_track
-            endsong(fin, jumping, false) if (current_track and not otr)
-            i = @tunes.index(t)
-            otr = i.nil?
-            @sock.puts "StartSong #{i-1} #{p}" unless otr
+        if playing
+          t = @tunes.current_track.get rescue next
+          controlling = @tunes.current_playlist.get == @tunes.playlist.get
+          if not @tunes.mute.get
+            # advanced?
+            if t != current_track
+              if plays and current_track
+                fin = (plays < current_track.played_count.get)
+              end
+              endsong(fin, jumping, false) if (current_track and not otr)
+              i = @tunes.index(t)
+              otr = i.nil?
+              @sock.puts "StartSong #{i-1} #{loc(t)}" unless otr
 
-            fin = false
-            current_track = p
-            @next == nil if t == @next
+              plays = t.played_count.get
+              current_track = t
+              @next == nil if t == @next
 
-          else # same track we've been playing
-            f = t.finish.get
-            pp = @tunes.player_position.get
-            fin = ((f - pp) < FinThreshold)
+            else # same track we've been playing
+              # are we jumping to the next track?
+              if controlling # for now, we don't have the sophistication to detect jumps unless we're controlling
+                i = t.index.get + 1
+                jumping = false
+                if i <= @tunes.playlist.count(:each => :track) and @next
+                  # we're jumping if the next track isn't the one we queued up
+                  jumping = (@tunes.playlist.tracks[t.index.get + 1].get != @next)
+                end
+              end
 
-            # are we jumping to the next track?
-            i = t.index.get + 1
-            jumping = false
-            if i <= @tunes.playlist.count(:each => :track) and @next
-              # we're jumping if the next track isn't the one we queued up
-              jumping = (@tunes.playlist.tracks[t.index.get + 1].get != @next)
             end
-
           end
-        end
 
-        # Control playlist
-        if playing and controlling
-          l = @tunes.playlist.count(:each => :track)
-          p = t.index.get
-          @sock.puts "SelectNext" if p == l
+          # Control playlist
+          if controlling
+            l = @tunes.playlist.count(:each => :track)
+            p = t.index.get
+            if p == l and not @waiting_for_next
+              @sock.puts "SelectNext"
+              @waiting_for_next = true
+            end
+          end
         end
       }
 
