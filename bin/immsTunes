@@ -274,10 +274,16 @@ Thread.new do
     $log.fatal "immsd connection lost"
     exit
   rescue
-    $log.fatal $!
-    exit 1
+    $log.error $!
+    retry
   end
 end
-imms.control
+
+begin
+  imms.control
+rescue
+  $log.error $!
+  retry
+end
 
 # This file is distributed under the Ruby License (http://www.ruby-lang.org/en/LICENSE.txt)
