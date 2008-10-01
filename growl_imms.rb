@@ -12,8 +12,12 @@ IO.popen("tail -f -q -n 1 #{HOME + '.imms' + 'imms.log'}", 'r') { |f|
   f.each_line do |l|
     puts l if verbose
     l.strip!
-    if l =~ /Rating: ([\d()]+).*After: ([\d()]+)/
-      msg = "Before: #{$1}, After: #{$2}"
+    if l =~ /Rating: ([^\]]+).*Last: ([^\]]+)(.*)After: ([^\]]+)/
+      before = $1
+      last = $2
+      flags = $3.tr('[]','').strip
+      after = $4
+      msg = "#{last} #{before} → #{after}\n#{flags}"
       system 'growlnotify', '-m', msg, '-d', 'imms.log', '-p', '-2', '-n', 'IMMS', '--image', Image.to_s, '-w'
       state = 0
     end
