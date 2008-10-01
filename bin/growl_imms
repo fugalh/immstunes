@@ -5,7 +5,7 @@ require 'rbconfig'
 # Find the image in datadir (if installed) or `dirname $0`/data/imms (if not)
 image = Pathname.new(Config::CONFIG['datadir']) + 'imms' + 'm.png'
 if not image.exist?
-  image = Pathname.new($0).dirname + 'data' + 'imms' + 'm.png'
+  image = Pathname.new($0).dirname + '..' + 'data' + 'imms' + 'm.png'
 end
 
 verbose = ARGV.include? '-v'
