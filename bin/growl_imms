@@ -29,7 +29,7 @@ IO.popen("tail -f -q -n 1 #{Pathname.new(ENV['HOME']) + '.imms' + 'imms.log'}", 
       # -w flag is a workaround. We don't want to actually wait, so we spawn.
       fork do 
         exec('growlnotify', '-m', msg, '-d', 'imms.log', '-p', '-2', '-n',
-               'IMMS', '--image', Image.to_s, '-w')
+               'IMMS', '--image', image.to_s, '-w')
       end
     end
   end
