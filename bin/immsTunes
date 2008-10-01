@@ -15,7 +15,7 @@ PollInterval = 2
 FinThreshold = 3
 
 # Logging
-$log = Logger.new STDERR
+$log = Logger.new STDOUT
 $log.datetime_format = "%Y-%m-%d %H:%M:%S "
 $log.level = Logger::INFO
 
