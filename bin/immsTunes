@@ -13,6 +13,8 @@ PollInterval = 1
 # If we are within this many seconds from the end of the track, the track is
 # considered not skipped. Should be at least bigger than PollInterval
 FinThreshold = 3
+# Idle threshold - we omit reporting music played while idle to IMMS.
+IdleThreshold = 10 * 60
 
 # Logging
 $log = Logger.new STDOUT
@@ -253,7 +255,7 @@ class IMMS
         if playing
           t = @tunes.current_track.get rescue next
           controlling = @tunes.current_playlist.get == @tunes.playlist.get
-          if not @tunes.mute.get
+          if not (@tunes.mute.get or idle)
             # advanced?
             if t != current_track
               if plays and current_track
@@ -261,7 +263,7 @@ class IMMS
               end
               if current_track and not otr
                 if $verbose
-                  $log.info "#{fin ? "Finished " : "Skipped "} " + 
+                  $log.info "#{fin ? "Finished" : "Skipped"} " + 
                     "#{jumping ? " (jumping)" : ""}"
                 end
                 @sock.puts "EndSong #{fin ? 1 : 0} " + 
@@ -323,6 +325,11 @@ class IMMS
   def close
     @sock.close
     Process.kill "INT", @immsd_pid
+  end
+
+  def idle
+    `ioreg -c IOHIDSystem | grep Idle | tail -n 1` =~ /"HIDIdleTime" = (\d+)/
+    $1.to_i/1000000000 > IdleThreshold
   end
 end
 

@@ -27,10 +27,11 @@ IO.popen("tail -f -n 1 #{Pathname.new(ENV['HOME']) + '.imms' + 'imms.log'}", 'r'
 
       # growlnotify has a bug that prevents it from working sometimes, but the
       # -w flag is a workaround. We don't want to actually wait, so we spawn.
-      fork do 
+      pid = fork do 
         exec('growlnotify', '-m', msg, '-d', 'imms.log', '-p', '-2', '-n',
                'IMMS', '--image', image.to_s, '-w')
       end
+      Process.detach pid
     end
   end
 }
