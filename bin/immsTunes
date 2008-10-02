@@ -199,7 +199,7 @@ class IMMS
             $log.info "Next: '#{t.name.get}'" if $verbose
             @waiting_for_next = false
           else
-            $log.debug "Rejecting #{t.name.get}" 
+            $log.debug "Rejecting '#{t.name.get}'" 
             @sock.puts 'SelectNext'
           end
 
