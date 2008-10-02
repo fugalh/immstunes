@@ -20,23 +20,31 @@ $log.datetime_format = "%Y-%m-%d %H:%M:%S "
 $log.level = Logger::INFO
 
 # Option parsing
-$log.level = Logger::WARN if ARGV.include?('-q')
-$verbose = ARGV.include?('-v')
-$log.level = Logger::DEBUG if ARGV.include?('-d')
-DEBUG = ARGV.include?('-D')
-if ARGV.include?('-h')
+case ARGV.join
+when /h/
   puts <<EOF
-usage: #{$0} [-q|-v] [-d]
+usage: #{$0} [-q|-v|-d]
   -q    quiet
   -v    verbose
   -d    debug
 EOF
   exit
+when /D/
+  $debug = true
+when /d/
+  $verbose = true
+  $log.level = Logger::DEBUG
+when /v/
+  $verbose = true
+when /q/
+  $log.level = Logger::WARN
 end
 
 
 # iTunes isn't a valid class name and ITunes is tacky.
 class Tunes < DelegateClass(Appscript::Application)
+  Cache = HOME + '.imms' + 'immsTunes.cache'
+
   # The music library
   attr :library
 
@@ -87,6 +95,33 @@ class Tunes < DelegateClass(Appscript::Application)
   def track_count
     @library.count(:each => :track)
   end
+
+  # Read the cache from ~/.imms/immsTunes.cache
+  def read_cache
+    if Cache.exist?
+      $log.info "Reading cache"
+      @track_cache = Cache.readlines.map{|l| l.strip}
+    else
+      write_cache
+    end
+  end
+
+  # Write the cache
+  def write_cache
+    $log.info "Generating cache"
+    @track_cache = tracks.get.map {|t| t.location.get rescue t.name.get }
+    File.open(Cache, 'w') {|f| f.puts @track_cache.join("\n")}
+  end
+
+  def track_cache
+    read_cache if not @track_cache
+
+    # rudimentary dirty check. immsd will detect more subtle changes
+    # (eventually)
+    write_cache if @track_cache.size != library.count(:each => :track)
+
+    @track_cache
+  end
 end
 
 class IMMS
@@ -110,12 +145,12 @@ class IMMS
     # add verbose/debug output on @sock.puts
     class << @sock
       def puts(str)
-        $log.debug "> #{str.strip}" if DEBUG or not str =~ /^Playlist(Item)? /
+        $log.debug "> #{str.strip}" if $debug or not str =~ /^Playlist(Item)? /
         super
       end
       def gets
         str = super
-        $log.debug "< #{str.strip}" if DEBUG or not str =~ /^GetPlaylistItem /
+        $log.debug "< #{str.strip}" if $debug or not str =~ /^GetPlaylistItem /
         str
       end
     end
@@ -179,11 +214,10 @@ class IMMS
           @sock.puts "PlaylistItem #{pos-1} #{path}"
 
         when 'GetEntirePlaylist'
+          c = @tunes.track_cache
           $log.info 'Sending entire playlist...'
-          @tunes.tracks.get.each do |track|
-            path = loc(track)
-            pos = track.index.get
-            @sock.puts "Playlist #{pos-1} #{path}"
+          c.each_with_index do |path,pos|
+            @sock.puts "Playlist #{pos} #{path}"
           end
           @sock.puts "PlaylistEnd"
           $log.info 'done.'
