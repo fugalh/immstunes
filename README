@@ -4,7 +4,7 @@ Requires Ruby, rb-appscript[2], IMMS and iTunes. You probably already have Ruby
 and iTunes.
 
 To build IMMS, download and extract the 3.1.0-rc4 tarball, then apply the
-imms-3.1.0-rc4.diff patch included with immsTunes.
+imms-3.1.0-rc4.diff patch included with immsTunes, then see README.osx.
 
 Install with
 

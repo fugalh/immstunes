@@ -38,7 +38,6 @@ class Tunes < DelegateClass(Appscript::Application)
   attr :playlist
 
   def initialize
-    @system = app('System Events')
     wait
 
     @app = app('iTunes')
@@ -66,13 +65,15 @@ class Tunes < DelegateClass(Appscript::Application)
 
   # Is iTunes running?
   def running
-    @system.processes.name.get.include? 'iTunes'
+    app('System Events').processes.name.get.include? 'iTunes'
   end
 
   # Wait for iTunes to be running
   def wait
-    until running
-      sleep 5
+    if not running
+      $log.info "Waiting for iTunes..."
+      sleep 1 until running
+      $log.debug "Hello, iTunes"
     end
   end
 
@@ -93,7 +94,7 @@ class IMMS
     begin
       @sock = UNIXSocket.open(HOME + '.imms' + 'socket')
     rescue Errno::ECONNREFUSED
-      fork do
+      @immsd_pid = fork do
         exec 'nice -n 5 immsd'
       end
       sleep 1
@@ -188,7 +189,6 @@ class IMMS
   end
 
   def endsong(finished, jumping, bad=false)
-    $log.debug "endsong finished=#{finished.inspect} jumping=#{jumping.inspect} bad=#{bad.inspect}"
     @sock.puts "EndSong #{finished ? 1 : 0} #{jumping ? 1 : 0} #{bad ? 1 : 0}"
   end
 
@@ -205,6 +205,9 @@ class IMMS
       @tunes.wait
 
       @mutex.synchronize {
+        # avoid the race condition
+        next unless @tunes.running
+
         # Observe listening behavior
 
         playing = (@tunes.player_state.get == :playing)
@@ -229,12 +232,15 @@ class IMMS
 
             else # same track we've been playing
               # are we jumping to the next track?
-              if controlling # for now, we don't have the sophistication to detect jumps unless we're controlling
+              # for now, we don't have the sophistication to detect jumps
+              # unless we're controlling
+              if controlling
                 i = t.index.get + 1
                 jumping = false
                 if i <= @tunes.playlist.count(:each => :track) and @next
                   # we're jumping if the next track isn't the one we queued up
-                  jumping = (@tunes.playlist.tracks[t.index.get + 1].get != @next)
+                  jumping = (@tunes.playlist.tracks[t.index.get + 1].get !=
+                             @next)
                 end
               end
 
@@ -257,7 +263,8 @@ class IMMS
     end
   end
 
-  # Get the imms identifier: location (filename) for file tracks, name for other kinds of tracks
+  # Get the imms identifier: location (filename) for file tracks, name for
+  # other kinds of tracks
   def loc(track)
     begin
       track.location.get
@@ -265,25 +272,29 @@ class IMMS
       track.name.get
     end
   end
-end
 
-imms = IMMS.new
-Thread.new do
-  begin
-    imms.dispatch
-    $log.fatal "immsd connection lost"
-    exit
-  rescue
-    $log.error $!
-    retry
+  # close immsd connection so it gets SIGPIPE and goes away so we can restart
+  def close
+    @sock.close
+    Process.kill "INT", @immsd_pid
   end
 end
 
 begin
+  imms = IMMS.new
+  dispatch = Thread.new do
+    imms.dispatch
+    raise "immsd connection lost"
+  end
   imms.control
 rescue
-  $log.error $!
+  $log.fatal $!
+  $log.info "Restarting"
+  dispatch.kill
+  imms.close
+  sleep 0.5
   retry
 end
 
-# This file is distributed under the Ruby License (http://www.ruby-lang.org/en/LICENSE.txt)
+# This file is distributed under the Ruby License
+# (http://www.ruby-lang.org/en/LICENSE.txt)
