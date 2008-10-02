@@ -20,8 +20,7 @@ you want it to control your playlist, put iTunes in Party Shuffle and set
 will work as it always did, without consulting IMMS).
 
 immsTunes accepts -q for quiet operation (warnings and errors only), -v for
-verbose operation (echo most commands to/from the server) and -d for debug
-(echo everything to/from server).
+verbose, and -d for debug messages.
 
 growl_imms is a simple daemon that watches your IMMS log and growls the
 before/after ratings. It's always interesting to see how the ratings are

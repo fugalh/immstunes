@@ -21,10 +21,16 @@ $log.level = Logger::INFO
 
 # Option parsing
 $log.level = Logger::WARN if ARGV.include?('-q')
-$log.level = Logger::DEBUG if ARGV.include?('-v')
-DEBUG = ARGV.include?('-d')
+$verbose = ARGV.include?('-v')
+$log.level = Logger::DEBUG if ARGV.include?('-d')
+DEBUG = ARGV.include?('-D')
 if ARGV.include?('-h')
-  puts "usage: #{$0} [-q|-v|-d]\n-q\tquiet\n-v\tverbose\n-d\tdebug"
+  puts <<EOF
+usage: #{$0} [-q|-v] [-d]
+  -q    quiet
+  -v    verbose
+  -d    debug
+EOF
   exit
 end
 
@@ -142,6 +148,7 @@ class IMMS
         cmd = line.split.first
         case cmd
         when 'ResetSelection'
+          $log.info "Resetting selection" if $verbose
           if @next
             @tunes.playlist.delete @next
           end
@@ -154,9 +161,10 @@ class IMMS
           t = @tunes.tracks[pos]
           if loc(t) != :missing_value and t.enabled.get and t.shufflable.get
             @next = @tunes.enqueue(t).get
-            $log.debug "upcoming: #{t.name.get}"
+            $log.info "Next: '#{t.name.get}'" if $verbose
             @waiting_for_next = false
           else
+            $log.debug "Rejecting #{t.name.get}" 
             @sock.puts 'SelectNext'
           end
 
@@ -171,14 +179,14 @@ class IMMS
           @sock.puts "PlaylistItem #{pos-1} #{path}"
 
         when 'GetEntirePlaylist'
-          $log.info 'Sending entire playlist'
+          $log.info 'Sending entire playlist...'
           @tunes.tracks.get.each do |track|
             path = loc(track)
             pos = track.index.get
             @sock.puts "Playlist #{pos-1} #{path}"
           end
           @sock.puts "PlaylistEnd"
-          $log.info 'Done sending playlist'
+          $log.info 'done.'
 
         else
           $log.error "Unknown Command '#{line}'"
@@ -186,10 +194,6 @@ class IMMS
         end
       }
     end
-  end
-
-  def endsong(finished, jumping, bad=false)
-    @sock.puts "EndSong #{finished ? 1 : 0} #{jumping ? 1 : 0} #{bad ? 1 : 0}"
   end
 
   # Observe iTunes and send stuff to the server
@@ -221,10 +225,18 @@ class IMMS
               if plays and current_track
                 fin = (plays < current_track.played_count.get)
               end
-              endsong(fin, jumping, false) if (current_track and not otr)
+              if current_track and not otr
+                if $verbose
+                  $log.info "#{fin ? "Finished " : "Skipped "} " + 
+                    "#{jumping ? " (jumping)" : ""}"
+                end
+                @sock.puts "EndSong #{fin ? 1 : 0} " + 
+                  "#{jumping ? 1 : 0} 0"
+              end
               i = @tunes.index(t)
               otr = i.nil?
               @sock.puts "StartSong #{i-1} #{loc(t)}" unless otr
+              $log.info "Playing '#{t.name.get}'" if $verbose
 
               plays = t.played_count.get
               current_track = t
