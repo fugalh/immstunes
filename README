@@ -26,7 +26,7 @@ growl_imms is a simple daemon that watches your IMMS log and growls the
 before/after ratings. It's always interesting to see how the ratings are
 changing, especially when you first start using IMMS.
 
-    growl_imms &
+    growl_imms -v &
 
 Distributed under the same license as Ruby.
 
