@@ -28,8 +28,11 @@ changing, especially when you first start using IMMS.
 
     growl_imms -v &
 
+Visit this project on bitbucket[4] for downloads, bug reports, etc.
+
 Distributed under the same license as Ruby.
 
 1. http://www.luminal.org/wiki/index.php/IMMS
 2. http://appscript.sourceforge.net/rb-appscript/index.html
 3. http://hans.fugal.net/blog/2008/09/19/imms
+4. http://www.bitbucket.org/fugalh/immstunes/
