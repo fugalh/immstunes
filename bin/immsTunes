@@ -325,6 +325,7 @@ class IMMS
   def close
     @sock.close
     Process.kill "INT", @immsd_pid
+    Process.wait @immsd_pid
   end
 
   def idle
