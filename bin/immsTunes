@@ -136,7 +136,7 @@ class IMMS
     $log.info 'Connecting to immsd'
     begin
       @sock = UNIXSocket.open(HOME + '.imms' + 'socket')
-    rescue Errno::ECONNREFUSED
+    rescue
       @immsd_pid = fork do
         exec 'nice -n 5 immsd'
       end
