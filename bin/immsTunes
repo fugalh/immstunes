@@ -60,7 +60,8 @@ class Tunes < DelegateClass(Appscript::Application)
     # Party Shuffle
     @queue = @app.playlists[its.special_kind.eq(:Party_Shuffle)].first.get
     # some playlist whose special kind is Music
-    @playlist = @app.playlists[its.special_kind.eq(:Music)].first
+    @playlist = (@app.playlists['IMMS'] rescue 
+                 @app.playlists[its.special_kind.eq(:Music)].first)
 
     # XXX what happens if we never unset this?
     fixed_indexing.set true
