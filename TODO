@@ -1,3 +1,15 @@
+Use IMMS playlist if it exists, else Music playlist
+    - update caching: cache (persistent_ID, location or nil) pairs (hash
+      to yaml)
+        - pl.tracks.persistent_ID.get is much faster than pl.tracks.get not to
+          mention pl.tracks.location.get which doesn't even work (because of
+          url tracks) without iterating through and rescuing (which is even
+          slower)
+        - when location is nil send the persistent_ID to imms, which will
+          probably call it [Unknown]
+        
+be more careful about sending commands only if @tunes.is_running?
+
 It'd sure be nice to get events from iTunes instead of polling. Is this
 possible? We'd need next song notification with some indication as to whether
 the previous song was skipped, and I think that's it.

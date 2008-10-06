@@ -54,8 +54,6 @@ class Tunes < DelegateClass(Appscript::Application)
   attr :playlist
 
   def initialize
-    wait
-
     @app = app('iTunes')
     super(@app)
 
@@ -80,16 +78,14 @@ class Tunes < DelegateClass(Appscript::Application)
   end
 
   # Is iTunes running?
-  def running
-    app('System Events').processes.name.get.include? 'iTunes'
-  end
+  alias :running :is_running?
 
   # Wait for iTunes to be running
   def wait
     if not running
       $log.info "Waiting for iTunes..."
       sleep 1 until running
-      $log.debug "Hello, iTunes"
+      $log.debug "Hello, iTunes."
     end
   end
 
