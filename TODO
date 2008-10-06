@@ -11,6 +11,8 @@ Use IMMS playlist if it exists, else Music playlist
 be more careful about sending commands only if @tunes.is_running? and make the
 them nonblocking?
 
+rewrite the README, it's getting unwieldy
+
 It'd sure be nice to get events from iTunes instead of polling. Is this
 possible? We'd need next song notification with some indication as to whether
 the previous song was skipped, and I think that's it.
