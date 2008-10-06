@@ -8,7 +8,8 @@ Use IMMS playlist if it exists, else Music playlist
         - when location is nil send the persistent_ID to imms, which will
           probably call it [Unknown]
         
-be more careful about sending commands only if @tunes.is_running?
+be more careful about sending commands only if @tunes.is_running? and make the
+them nonblocking?
 
 It'd sure be nice to get events from iTunes instead of polling. Is this
 possible? We'd need next song notification with some indication as to whether
