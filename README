@@ -30,6 +30,9 @@ changing, especially when you first start using IMMS.
 
 Visit this project on bitbucket[4] for downloads, bug reports, etc.
 
+It appears that poking iTunes with AppleScript as we do can cause it to crash
+if you have crossfading enabled. 
+
 Distributed under the same license as Ruby.
 
 1. http://www.luminal.org/wiki/index.php/IMMS
