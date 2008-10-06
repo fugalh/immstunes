@@ -14,7 +14,7 @@ if ARGV.include? '-h'
   exit
 end
 
-IO.popen("tail -f -n 1 #{Pathname.new(ENV['HOME']) + '.imms' + 'imms.log'}", 'r') { |f|
+IO.popen("tail -F -n 1 #{Pathname.new(ENV['HOME']) + '.imms' + 'imms.log'}", 'r') { |f|
   f.each_line do |l|
     puts l if verbose
 
