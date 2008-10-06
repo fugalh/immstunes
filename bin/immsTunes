@@ -62,6 +62,7 @@ class Tunes < DelegateClass(Appscript::Application)
     # some playlist whose special kind is Music
     @playlist = (@app.playlists['IMMS'] rescue 
                  @app.playlists[its.special_kind.eq(:Music)].first)
+    $log.info "Using playlist '#{@playlist.name.get}'"
 
     # XXX what happens if we never unset this?
     fixed_indexing.set true

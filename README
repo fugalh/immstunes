@@ -19,6 +19,14 @@ you want it to control your playlist, put iTunes in Party Shuffle and set
 "Display Upcoming Tracks" to 0 (if you set it to any other value, Party Shuffle
 will work as it always did, without consulting IMMS).
 
+immsTunes will use the IMMS playlist as its master playlist, if it exists,
+otherwise your local Music playlist. If you keep most of your music in a large
+iPod, you would want to add it to the IMMS playlist. It's easy to set up a
+live-updating smart playlist with the music you want. For best results, add
+them as files on the filesystem (using e.g. FUSEPod[4]) so that immsd can find
+them and analyze them. If you just drag them from the iTunes source, immsd
+won't be able to analyze the files for tags or audio content.
+
 immsTunes accepts -q for quiet operation (warnings and errors only), -v for
 verbose, and -d for debug messages.
 
@@ -28,7 +36,7 @@ changing, especially when you first start using IMMS.
 
     growl_imms -v &
 
-Visit this project on bitbucket[4] for downloads, bug reports, etc.
+Visit this project on bitbucket[5] for downloads, bug reports, etc.
 
 It appears that poking iTunes with AppleScript as we do can cause it to crash
 if you have crossfading enabled. 
@@ -38,4 +46,5 @@ Distributed under the same license as Ruby.
 1. http://www.luminal.org/wiki/index.php/IMMS
 2. http://appscript.sourceforge.net/rb-appscript/index.html
 3. http://hans.fugal.net/blog/2008/09/19/imms
-4. http://www.bitbucket.org/fugalh/immstunes/
+4. http://sourceforge.net/projects/fusepod
+5. http://www.bitbucket.org/fugalh/immstunes/
