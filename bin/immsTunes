@@ -48,28 +48,31 @@ class Tunes < DelegateClass(Appscript::Application)
   Cache = HOME + '.imms' + 'immsTunes.cache'
 
   # The music library
-  attr :library
-
-  # The playlist we manage, e.g. Party Shuffle
   attr :playlist
+
+  # The playlist we manage, i.e. Party Shuffle
+  attr :queue
 
   def initialize
     @app = app('iTunes')
     super(@app)
 
-    @playlist = @app.playlists[its.special_kind.eq(:Party_Shuffle)].first.get
-    @library = @app.library_playlists.first.get
+    # Party Shuffle
+    @queue = @app.playlists[its.special_kind.eq(:Party_Shuffle)].first.get
+    # some playlist whose special kind is Music
+    @playlist = @app.playlists[its.special_kind.eq(:Music)].first
 
+    # XXX what happens if we never unset this?
     fixed_indexing.set true
   end
   
   def enqueue(track)
-    duplicate track, :to => playlist
+    duplicate track, :to => queue
   end
   
   # Get the index of this track in the library
   def index(track)
-    t = tracks[its.persistent_ID.eq(track.persistent_ID.get)].get.first
+    t = playlist.tracks[its.persistent_ID.eq(track.persistent_ID.get)].first.get
     if t
       t.index.get
     else
@@ -91,7 +94,7 @@ class Tunes < DelegateClass(Appscript::Application)
 
   # How many tracks in the library?
   def track_count
-    @library.count(:each => :track)
+    playlist.count(:each => :track)
   end
 
   # Read the cache from ~/.imms/immsTunes.cache
@@ -107,7 +110,7 @@ class Tunes < DelegateClass(Appscript::Application)
   # Write the cache
   def write_cache
     $log.info "Generating cache"
-    @track_cache = tracks.get.map {|t| t.location.get rescue t.name.get }
+    @track_cache = playlist.tracks.get.map {|t| t.location.get rescue t.name.get }
     File.open(Cache, 'w') {|f| f.puts @track_cache.join("\n")}
   end
 
@@ -116,7 +119,7 @@ class Tunes < DelegateClass(Appscript::Application)
 
     # rudimentary dirty check. immsd will detect more subtle changes
     # (eventually)
-    write_cache if @track_cache.size != library.count(:each => :track)
+    write_cache if @track_cache.size != playlist.count(:each => :track)
 
     @track_cache
   end
@@ -183,7 +186,7 @@ class IMMS
         when 'ResetSelection'
           $log.info "Resetting selection" if $verbose
           if @next
-            @tunes.playlist.delete @next
+            @tunes.queue.delete @next
           end
 
         when 'TryAgain'
@@ -191,7 +194,7 @@ class IMMS
 
         when 'EnqueueNext'
           pos = line.split.last.to_i+1
-          t = @tunes.tracks[pos]
+          t = @tunes.playlist.tracks[pos]
           if loc(t) != :missing_value and t.enabled.get and t.shufflable.get
             @next = @tunes.enqueue(t).get
             $log.info "Next: '#{t.name.get}'" if $verbose
@@ -207,7 +210,7 @@ class IMMS
 
         when 'GetPlaylistItem'
           pos = line.split.last.to_i+1
-          t = @tunes.tracks[pos]
+          t = @tunes.playlist.tracks[pos]
           path = loc(t)
           @sock.puts "PlaylistItem #{pos-1} #{path}"
 
@@ -250,7 +253,7 @@ class IMMS
 
         if playing
           t = @tunes.current_track.get rescue next
-          controlling = @tunes.current_playlist.get == @tunes.playlist.get
+          controlling = @tunes.current_playlist.get == @tunes.queue.get
           if not (@tunes.mute.get or idle)
             # advanced?
             if t != current_track
@@ -281,9 +284,9 @@ class IMMS
               if controlling
                 i = t.index.get + 1
                 jumping = false
-                if i <= @tunes.playlist.count(:each => :track) and @next
+                if i <= @tunes.queue.count(:each => :track) and @next
                   # we're jumping if the next track isn't the one we queued up
-                  jumping = (@tunes.playlist.tracks[t.index.get + 1].get !=
+                  jumping = (@tunes.queue.tracks[t.index.get + 1].get !=
                              @next)
                 end
               end
@@ -293,7 +296,7 @@ class IMMS
 
           # Control playlist
           if controlling
-            l = @tunes.playlist.count(:each => :track)
+            l = @tunes.queue.count(:each => :track)
             p = t.index.get
             if p == l and not @waiting_for_next
               @sock.puts "SelectNext"
