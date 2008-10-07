@@ -1,7 +1,7 @@
 Index: imms-3.1.0-rc6/configure.ac
 ===================================================================
 --- imms-3.1.0-rc6.orig/configure.ac	2008-10-06 20:20:43.000000000 -0600
-+++ imms-3.1.0-rc6/configure.ac	2008-10-06 20:20:45.000000000 -0600
++++ imms-3.1.0-rc6/configure.ac	2008-10-07 07:47:03.000000000 -0600
 @@ -101,6 +101,7 @@ if test "$with_pcre" = "no"; then
      AC_MSG_ERROR([PCRE required and missing.])
  else
@@ -10,7 +10,7 @@ Index: imms-3.1.0-rc6/configure.ac
  fi
  
  if test "$enable_analyzer" != "no"; then
-@@ -139,12 +140,12 @@ if test "$enable_analyzer" != "no"; then
+@@ -139,18 +140,19 @@ if test "$enable_analyzer" != "no"; then
  fi
  
  AC_CHECK_TOOL(OBJCOPY, objcopy)
@@ -28,6 +28,13 @@ Index: imms-3.1.0-rc6/configure.ac
      AC_MSG_CHECKING(for object target)
      octarget=`$OBJDUMP --info | sed -ne '2p'` # extract first target
      AC_MSG_RESULT($octarget)
+     AC_MSG_CHECKING(for object architecture)
+     ocarch=`$OBJDUMP --info | sed -ne '4p'` # extract corresponding arch
+     AC_MSG_RESULT($ocarch)
++    AC_SUBST(SVM_SIMILARITY, svm-similarity-data.o)
+ fi
+ AC_SUBST(OBJCOPYTARGET, $octarget)
+ AC_SUBST(OBJCOPYARCH, $ocarch)
 Index: imms-3.1.0-rc6/immsd/immsd.cc
 ===================================================================
 --- imms-3.1.0-rc6.orig/immsd/immsd.cc	2008-10-06 20:20:43.000000000 -0600
@@ -80,8 +87,14 @@ Index: imms-3.1.0-rc6/rules.mk
 Index: imms-3.1.0-rc6/model/model.cc
 ===================================================================
 --- imms-3.1.0-rc6.orig/model/model.cc	2008-10-06 20:20:43.000000000 -0600
-+++ imms-3.1.0-rc6/model/model.cc	2008-10-06 20:20:45.000000000 -0600
-@@ -86,10 +86,15 @@ public:
++++ imms-3.1.0-rc6/model/model.cc	2008-10-07 07:41:25.000000000 -0600
+@@ -81,15 +81,20 @@ public:
+         string filename = get_imms_root("svm-similarity");
+         if (file_exists(filename))
+         {
+-            LOG(INFO) << "Overriding the built in model with " << filename;
++            LOG(INFO) << "Overriding the built in model with " << filename << endl;
+             model.reset(new DiskXFile(filename.c_str(), "r"));
          }
          else
          {
@@ -124,10 +137,35 @@ Index: imms-3.1.0-rc6/Torch3.diff
 ++	mkdir -p $(PREFIX)/{lib,include/torch}
 ++	cp {gradients,distributions,kernels}/*.h $(PREFIX)/include
 ++	cp $< $(PREFIX)/lib
+Index: imms-3.1.0-rc6/build/Makefile
+===================================================================
+--- imms-3.1.0-rc6.orig/build/Makefile	2008-10-06 18:29:42.000000000 -0600
++++ imms-3.1.0-rc6/build/Makefile	2008-10-07 07:45:46.000000000 -0600
+@@ -15,7 +15,7 @@ training: training_data train_model
+ libimmscore.a: $(call objects,../immscore)
+ 	$(AR) $(ARFLAGS) $@ $(filter %.o,$^)
+ 
+-libmodel.a: $(call objects,../model) svm-similarity-data.o
++libmodel.a: $(call objects,../model) $(SVM_SIMILARITY)
+ 	$(AR) $(ARFLAGS) $@ $(filter %.o,$^)
+ 
+ immstool: immstool.o libmodel.a libimmscore.a mfcckeeper.o
+Index: imms-3.1.0-rc6/vars.mk.in
+===================================================================
+--- imms-3.1.0-rc6.orig/vars.mk.in	2008-10-06 19:52:06.000000000 -0600
++++ imms-3.1.0-rc6/vars.mk.in	2008-10-07 07:46:05.000000000 -0600
+@@ -8,6 +8,7 @@ OBJCOPY = @OBJCOPY@
+ OBJDUMP = @OBJDUMP@
+ OBJCOPYTARGET = @OBJCOPYTARGET@
+ OBJCOPYARCH = @OBJCOPYARCH@
++SVM_SIMILARITY= @SVM_SIMILARITY@
+ exec_prefix = @exec_prefix@
+ bindir = @bindir@
+ datadir = @datadir@
 Index: imms-3.1.0-rc6/README.osx
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ imms-3.1.0-rc6/README.osx	2008-10-06 20:20:45.000000000 -0600
++++ imms-3.1.0-rc6/README.osx	2008-10-07 07:49:45.000000000 -0600
 @@ -0,0 +1,30 @@
 +You will need the following dependencies from MacPorts (http://macports.org):
 +
