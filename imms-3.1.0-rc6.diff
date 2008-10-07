@@ -1,86 +1,37 @@
 Index: imms-3.1.0-rc6/configure.ac
 ===================================================================
---- imms-3.1.0-rc6.orig/configure.ac	2008-10-05 22:55:06.000000000 -0600
-+++ imms-3.1.0-rc6/configure.ac	2008-10-06 07:09:08.000000000 -0600
-@@ -43,8 +43,8 @@ AC_ARG_ENABLE(queuecontrol,
-             [enable_queuecontrol=$enableval])
- 
- AC_ARG_ENABLE(analyzer,
--            AC_HELP_STRING([--disable-analyzer],
--                           [Disable acoustic song similarity analyzer]),
-+            AC_HELP_STRING([--enable-analyzer],
-+                           [Enable acoustic song similarity analyzer]),
-             [enable_analyzer=$enableval])
- 
- AC_ARG_ENABLE(immsremote,
-@@ -101,9 +101,10 @@ if test "$with_pcre" = "no"; then
+--- imms-3.1.0-rc6.orig/configure.ac	2008-10-06 20:20:43.000000000 -0600
++++ imms-3.1.0-rc6/configure.ac	2008-10-06 20:20:45.000000000 -0600
+@@ -101,6 +101,7 @@ if test "$with_pcre" = "no"; then
      AC_MSG_ERROR([PCRE required and missing.])
  else
      LIBS="$LIBS $pcre_LIBS"
 +    CPPFLAGS="$CPPFLAGS $pcre_CFLAGS"
  fi
  
--if test "$enable_analyzer" != "no"; then
-+if test "$enable_analyzer" == "yes"; then
-     PKG_CHECK_MODULES([FFTW], [fftw3 >= 3.0],
-                       [], [have_fftw=no])
-     if test "$have_fftw" = "no"; then
-@@ -115,7 +116,7 @@ if test "$enable_analyzer" != "no"; then
-     fi
- fi
- 
--if test "$enable_analyzer" != "no"; then
-+if test "$enable_analyzer" == "yes"; then
-     AC_CHECK_HEADERS(torch/KMeans.h,, [have_torch=no])
- 
-     saved_libs="$LIBS"
-@@ -139,10 +140,14 @@ if test "$enable_analyzer" != "no"; then
+ if test "$enable_analyzer" != "no"; then
+@@ -139,12 +140,12 @@ if test "$enable_analyzer" != "no"; then
  fi
  
  AC_CHECK_TOOL(OBJCOPY, objcopy)
-+AC_CHECK_TOOL(OBJDUMP, objdump)
+-if test "x$OBJCOPY" = "x"; then
+-    AC_MSG_ERROR("objcopy from GNU binutils >= 2.11.90 not found")
+-fi
+ AC_CHECK_TOOL(OBJDUMP, objdump)
+-dnl extract target and architecture if objdump was found
+-if test "x$OBJDUMP" = "x"; then :; else
 +if test "x$OBJCOPY" = "x"; then
-+    AC_CHECK_TOOL(OBJCOPY, gobjcopy)
-+    AC_CHECK_TOOL(OBJDUMP, gobjdump)
-+fi
- if test "x$OBJCOPY" = "x"; then
-     AC_MSG_ERROR("objcopy from GNU binutils >= 2.11.90 not found")
- fi
--AC_CHECK_TOOL(OBJDUMP, objdump)
- dnl extract target and architecture if objdump was found
- if test "x$OBJDUMP" = "x"; then :; else
++    AC_MSG_WARN("objcopy from GNU binutils >= 2.11.90 not found")
++    AC_DEFINE(BROKEN_OBJCOPY,, [broken objcopy])
++else
++    dnl extract target and architecture if objdump was found
      AC_MSG_CHECKING(for object target)
-@@ -161,7 +166,7 @@ PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2
- saved_cppflags="$CPPFLAGS"
- saved_libs="$LIBS"
- 
--if test "$enable_analyzer" != "no"; then
-+if test "$enable_analyzer" == "yes"; then
-     CPPFLAGS="`pkg-config fftw3 --cflags`"
-     LIBS="`pkg-config fftw3 --libs`"
-     AC_CHECK_HEADERS(fftw3.h,, [with_fftw=no])
-@@ -232,7 +237,7 @@ else
-     fi
- fi
- 
--if test "$enable_analyzer" != "no"; then
-+if test "$enable_analyzer" == "yes"; then
-     AC_CHECK_PROG(have_sox, sox, "yes", "no")
-     if test "$have_sox" = "no"; then
-         AC_MSG_WARN([******************************************************]);
-@@ -362,7 +367,7 @@ else 
-     AC_APPEND(PLUGINS, libaudaciousimms.so)
- fi
- 
--if test "$enable_analyzer" != "no"; then
-+if test "$enable_analyzer" == "yes"; then
-     AC_APPEND(OPTIONAL, analyzer)
-     AC_DEFINE(ANALYZER_ENABLED,, [Analyzer enabled])
- fi
+     octarget=`$OBJDUMP --info | sed -ne '2p'` # extract first target
+     AC_MSG_RESULT($octarget)
 Index: imms-3.1.0-rc6/immsd/immsd.cc
 ===================================================================
---- imms-3.1.0-rc6.orig/immsd/immsd.cc	2008-10-05 22:55:06.000000000 -0600
-+++ imms-3.1.0-rc6/immsd/immsd.cc	2008-10-06 06:59:49.000000000 -0600
+--- imms-3.1.0-rc6.orig/immsd/immsd.cc	2008-10-06 20:20:43.000000000 -0600
++++ imms-3.1.0-rc6/immsd/immsd.cc	2008-10-06 20:20:45.000000000 -0600
 @@ -231,6 +231,7 @@ void quit(int signum)
      if (loop)
          g_main_quit(loop);
@@ -91,8 +42,8 @@ Index: imms-3.1.0-rc6/immsd/immsd.cc
  
 Index: imms-3.1.0-rc6/Makefile
 ===================================================================
---- imms-3.1.0-rc6.orig/Makefile	2008-10-05 22:55:06.000000000 -0600
-+++ imms-3.1.0-rc6/Makefile	2008-10-06 06:59:52.000000000 -0600
+--- imms-3.1.0-rc6.orig/Makefile	2008-10-06 20:20:43.000000000 -0600
++++ imms-3.1.0-rc6/Makefile	2008-10-06 20:20:45.000000000 -0600
 @@ -9,6 +9,7 @@ configure: configure.ac
  	autoheader
  	aclocal
@@ -112,8 +63,8 @@ Index: imms-3.1.0-rc6/Makefile
  %:
 Index: imms-3.1.0-rc6/rules.mk
 ===================================================================
---- imms-3.1.0-rc6.orig/rules.mk	2008-10-05 22:55:06.000000000 -0600
-+++ imms-3.1.0-rc6/rules.mk	2008-10-06 07:00:07.000000000 -0600
+--- imms-3.1.0-rc6.orig/rules.mk	2008-10-06 20:20:43.000000000 -0600
++++ imms-3.1.0-rc6/rules.mk	2008-10-06 20:20:45.000000000 -0600
 @@ -14,9 +14,8 @@ link = $(CXX) $(filter-out %.a,$1) $(fil
  %.o: %.c; $(call compile, $(CC), $<, $@, $($*-CFLAGS) $(CFLAGS) $($*-CPPFLAGS) $(CPPFLAGS))
  %: %.o; $(call link, $^ $($*-OBJ) $(LIBS), $@, $($*-LIBS) $(LDFLAGS))
@@ -126,50 +77,59 @@ Index: imms-3.1.0-rc6/rules.mk
  
  %-data.o: %
  	$(OBJCOPY) -I binary -O $(OBJCOPYTARGET) -B $(OBJCOPYARCH) --rename-section .data=.rodata,alloc,load,readonly,data,contents $< $@
-@@ -26,9 +25,9 @@ objects=$(sort $(notdir $(foreach type,c
- objects_c=$(patsubst %.c,%.o,$(wildcard $(addsuffix /*.c,$1)))
- objects_cc=$(patsubst %.cc,%.o,$(wildcard $(addsuffix /*.cc,$1)))
- 
--.PHONY: install analyzer_install immsremote_install
-+.PHONY: install analyzer_install immsremote_install immstool_install
- 
- install: all plugins_install programs_install
- 
- programs_install: $(patsubst %,%_install,$(OPTIONAL))
--	${INSTALL} -D immsd immstool $(bindir)
-+	${INSTALL} -D immsd $(bindir)
-Index: imms-3.1.0-rc6/build/Makefile
+Index: imms-3.1.0-rc6/model/model.cc
 ===================================================================
---- imms-3.1.0-rc6.orig/build/Makefile	2008-10-05 22:55:06.000000000 -0600
-+++ imms-3.1.0-rc6/build/Makefile	2008-10-06 07:00:07.000000000 -0600
-@@ -8,7 +8,7 @@ first: ../configure
- 
- include ../rules.mk
- 
--all: immsd immstool $(OPTIONAL) $(PLUGINS)
-+all: immsd $(OPTIONAL) $(PLUGINS)
- 
- training: training_data train_model
- 
-@@ -58,3 +58,6 @@ immsremote_install: immsremote glade_ins
- 
- glade_install: ../immsremote/immsremote.glade
- 	${INSTALL} -m 644 -D $< $(datadir)/imms/immsremote.glade
+--- imms-3.1.0-rc6.orig/model/model.cc	2008-10-06 20:20:43.000000000 -0600
++++ imms-3.1.0-rc6/model/model.cc	2008-10-06 20:20:45.000000000 -0600
+@@ -86,10 +86,15 @@ public:
+         }
+         else
+         {
++#ifndef BROKEN_OBJCOPY
+             static const size_t data_size = &_binary____data_svm_similarity_end
+                 - &_binary____data_svm_similarity_start;
+             model.reset(new MemoryXFile(
+                         &_binary____data_svm_similarity_start, data_size));
++#else
++            LOG(ERROR) << "Couldn't find the built-in model at " << filename << endl;
++            exit(1);
++#endif
+         }
+         normalizer.load(model.get());
+         svm.loadXFile(model.get());
+Index: imms-3.1.0-rc6/Torch3.diff
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ imms-3.1.0-rc6/Torch3.diff	2008-10-06 20:20:45.000000000 -0600
+@@ -0,0 +1,22 @@
++---
++ makefile |   13 +++++++++++++
++ 1 file changed, 13 insertions(+)
 +
-+immstool_install: immstool
-+	${INSTALL} -D immstool $(bindir)
++Index: Torch3/makefile
++===================================================================
++--- /dev/null	1970-01-01 00:00:00.000000000 +0000
+++++ Torch3/makefile	2008-10-06 20:13:28.000000000 -0600
++@@ -0,0 +1,13 @@
+++# frontend makefile for IMMS users
+++PREFIX=/usr/local
+++
+++libs/Darwin_opt_float/libtorch.a: Darwin.cfg
+++	./xmake
+++
+++Darwin.cfg: config/Darwin.cfg
+++	sed -e 's/packages =/packages = gradients distributions kernels/' $< > $@
+++
+++install: libs/Darwin_opt_float/libtorch.a
+++	mkdir -p $(PREFIX)/{lib,include/torch}
+++	cp {gradients,distributions,kernels}/*.h $(PREFIX)/include
+++	cp $< $(PREFIX)/lib
 Index: imms-3.1.0-rc6/README.osx
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ imms-3.1.0-rc6/README.osx	2008-10-06 07:11:45.000000000 -0600
-@@ -0,0 +1,26 @@
-+Presently the analyzer doesn't work, so it is disabled by default. If you are
-+interested in trying to remedy this situation, and you know a thing or two
-+about objcopy and other wizardry, see http://tinyurl.com/4ctrmr.
-+
-+As a result, you shouldn't need Torch or FFTW3, but you will need the other IMMS
-+dependencies. Assuming you use MacPorts (http://www.macports.org/), install the
-+following packages:
++++ imms-3.1.0-rc6/README.osx	2008-10-06 20:20:45.000000000 -0600
+@@ -0,0 +1,30 @@
++You will need the following dependencies from MacPorts (http://macports.org):
 +
 +    pcre
 +    glib2
@@ -180,11 +140,21 @@ Index: imms-3.1.0-rc6/README.osx
 +    pkgconfig
 +    binutils
 +
-+Finally, just
++In addition, you will need Torch (http://www.torch.ch/). To install Torch,
++download and extract the source, apply Torch3.diff, then:
++
++    make
++    sudo make install
++
++Torch is now installed.
++
++Finally, in the IMMS directory just type:
 +
 +    ./configure
 +    make
 +    sudo make install
++    mkdir -p ~/.imms
++    cp data/svm-similarity ~/.imms
 +
 +Let me know if this doesn't work for you.
 +
