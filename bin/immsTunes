@@ -5,6 +5,7 @@ require 'pathname'
 require 'logger'
 require 'thread'
 require 'appscript'
+require 'yaml'
 include Appscript
 
 HOME = Pathname.new(ENV['HOME'])
@@ -45,34 +46,99 @@ end
 
 # iTunes isn't a valid class name and ITunes is tacky.
 class Tunes < DelegateClass(Appscript::Application)
-  Cache = HOME + '.imms' + 'immsTunes.cache'
+
+  # A hash of persistent_ID to (location or persistent_ID)
+  class Cache < DelegateClass(Hash)
+    CacheFile = HOME + '.imms' + 'immsTunes.cache'
+
+    def initialize(iTunes)
+      @tunes = iTunes
+      @hsh = {}
+      super @hsh
+      read
+    end
+
+    # Read the cache from ~/.imms/immsTunes.cache
+    def read
+      if CacheFile.exist?
+        $log.info "Reading cache"
+        h = ((YAML.load(CacheFile.read) rescue nil) or {})
+        self.merge h
+      end
+      self
+    end
+
+    # Write the cache
+    def write
+      $log.info "Writing cache"
+      CacheFile.open('w') {|f| f.puts @hsh.to_yaml}
+      self
+    end
+
+    def refresh(thorough=false)
+      flag = false
+      if thorough or self.empty?
+        $log.info "Generating cache"
+        @tunes.playlist.tracks.get.each do |t|
+          id = t.persistent_ID.get
+          self[id] = @tunes.loc(t)
+          flag = true
+        end
+      else
+        $log.info "Refreshing cache"
+        # it's usually faster to query just the persistent IDs
+        @tunes.playlist.tracks.persistent_ID.get.each do |id|
+          unless self.has_key?(id)
+            t = @tunes.playlist.tracks[its.persistent_ID.eq(id)].get
+            self[id] = @tunes.loc(t)
+            flag = true
+          end
+        end
+      end
+      write if flag
+      self
+    end
+
+    # rudimentary dirty check. immsd will detect more subtle changes
+    # (eventually)
+    def dirty
+      self.size != @tunes.playlist.count(:each => :track)
+    end
+
+  end
 
   # The music library
   attr :playlist
-
   # The playlist we manage, i.e. Party Shuffle
   attr :queue
+  attr :cache
 
+  # Is iTunes running?
+  alias :running :is_running?
+  
   def initialize
     @app = app('iTunes')
     super(@app)
 
-    # Party Shuffle
-    @queue = @app.playlists[its.special_kind.eq(:Party_Shuffle)].first.get
+    # XXX what happens if we never unset this?
+    fixed_indexing.set true
+
     # some playlist whose special kind is Music
     @playlist = (@app.playlists['IMMS'] rescue 
                  @app.playlists[its.special_kind.eq(:Music)].first)
     $log.info "Using playlist '#{@playlist.name.get}'"
 
-    # XXX what happens if we never unset this?
-    fixed_indexing.set true
+    # Party Shuffle
+    @queue = @app.playlists[its.special_kind.eq(:Party_Shuffle)].first.get
+
+    @cache = Cache.new(self)
   end
-  
+
   def enqueue(track)
     duplicate track, :to => queue
   end
-  
-  # Get the index of this track in the library
+
+  # Get the index of this track in the playlist
   def index(track)
     t = playlist.tracks[its.persistent_ID.eq(track.persistent_ID.get)].first.get
     if t
@@ -82,8 +148,10 @@ class Tunes < DelegateClass(Appscript::Application)
     end
   end
 
-  # Is iTunes running?
-  alias :running :is_running?
+  # How many tracks in the playlist?
+  def track_count
+    playlist.count(:each => :track)
+  end
 
   # Wait for iTunes to be running
   def wait
@@ -94,36 +162,9 @@ class Tunes < DelegateClass(Appscript::Application)
     end
   end
 
-  # How many tracks in the library?
-  def track_count
-    playlist.count(:each => :track)
-  end
-
-  # Read the cache from ~/.imms/immsTunes.cache
-  def read_cache
-    if Cache.exist?
-      $log.info "Reading cache"
-      @track_cache = Cache.readlines.map{|l| l.strip}
-    else
-      write_cache
-    end
-  end
-
-  # Write the cache
-  def write_cache
-    $log.info "Generating cache"
-    @track_cache = playlist.tracks.get.map {|t| t.location.get rescue t.name.get }
-    File.open(Cache, 'w') {|f| f.puts @track_cache.join("\n")}
-  end
-
-  def track_cache
-    read_cache if not @track_cache
-
-    # rudimentary dirty check. immsd will detect more subtle changes
-    # (eventually)
-    write_cache if @track_cache.size != playlist.count(:each => :track)
-
-    @track_cache
+  # The location (for file tracks) or persistent_ID (for everything else)
+  def loc(track)
+    (track.location.get rescue track.persistent_ID.get).to_s
   end
 end
 
@@ -197,7 +238,7 @@ class IMMS
         when 'EnqueueNext'
           pos = line.split.last.to_i+1
           t = @tunes.playlist.tracks[pos]
-          if loc(t) != :missing_value and t.enabled.get and t.shufflable.get
+          if t.enabled.get and t.shufflable.get
             @next = @tunes.enqueue(t).get
             $log.info "Next: '#{t.name.get}'" if $verbose
             @waiting_for_next = false
@@ -208,19 +249,20 @@ class IMMS
 
         when 'PlaylistChanged'
           $log.warn 'immsd detected playlist change'
+          @tunes.cache.refresh true
           playlist_changed
 
         when 'GetPlaylistItem'
           pos = line.split.last.to_i+1
           t = @tunes.playlist.tracks[pos]
-          path = loc(t)
+          path = @tunes.loc(t)
           @sock.puts "PlaylistItem #{pos-1} #{path}"
 
         when 'GetEntirePlaylist'
-          c = @tunes.track_cache
           $log.info 'Sending entire playlist...'
-          c.each_with_index do |path,pos|
-            @sock.puts "Playlist #{pos} #{path}"
+          c = @tunes.cache.refresh
+          @tunes.playlist.tracks.persistent_ID.get.each_with_index do |id,pos|
+            @sock.puts "Playlist #{pos} #{c[id]}"
           end
           @sock.puts "PlaylistEnd"
           $log.info 'done.'
@@ -272,7 +314,7 @@ class IMMS
               end
               i = @tunes.index(t)
               otr = i.nil?
-              @sock.puts "StartSong #{i-1} #{loc(t)}" unless otr
+              @sock.puts "StartSong #{i-1} #{@tunes.loc(t)}" unless otr
               $log.info "Playing '#{t.name.get}'" if $verbose
 
               plays = t.played_count.get
@@ -309,16 +351,6 @@ class IMMS
       }
 
       sleep PollInterval
-    end
-  end
-
-  # Get the imms identifier: location (filename) for file tracks, name for
-  # other kinds of tracks
-  def loc(track)
-    begin
-      track.location.get
-    rescue Appscript::CommandError
-      track.name.get
     end
   end
 
