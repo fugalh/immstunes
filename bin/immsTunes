@@ -80,10 +80,10 @@ class Tunes < DelegateClass(Appscript::Application)
       flag = false
       if thorough or self.empty?
         $log.info "Generating cache"
+        flag = true
         @tunes.playlist.tracks.get.each do |t|
           id = t.persistent_ID.get
           self[id] = @tunes.loc(t)
-          flag = true
         end
       else
         $log.info "Refreshing cache"
