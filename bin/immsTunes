@@ -64,7 +64,7 @@ class Tunes < DelegateClass(Appscript::Application)
         $log.info "Reading cache"
         h = (YAML.load(CacheFile.read) rescue nil)
         h = {} unless Hash === h
-        self.merge h
+        self.merge! h
       end
       self
     end
@@ -76,25 +76,29 @@ class Tunes < DelegateClass(Appscript::Application)
       self
     end
 
-    def refresh(thorough=false)
+    def refresh
       flag = false
-      if thorough or self.empty?
+      @ids = @tunes.playlist.tracks.persistent_ID.get
+      if self.empty?
         $log.info "Generating cache"
         flag = true
         @tunes.playlist.tracks.get.each do |t|
           id = t.persistent_ID.get
           self[id] = @tunes.loc(t)
         end
-      else
+      else # it's usually faster to query just the persistent IDs
         $log.info "Refreshing cache"
-        # it's usually faster to query just the persistent IDs
-        @tunes.playlist.tracks.persistent_ID.get.each do |id|
+        ids.each do |id|
           unless self.has_key?(id)
             t = @tunes.playlist.tracks[its.persistent_ID.eq(id)].get
             self[id] = @tunes.loc(t)
             flag = true
           end
         end
+      end
+      # check for non-unique persistent IDs, because we're paranoid
+      if ids.uniq.size != ids.size
+        $log.warning "Non-unique persistent IDs found! Please contact me"
       end
       write if flag
       self
@@ -106,6 +110,11 @@ class Tunes < DelegateClass(Appscript::Application)
       self.size != @tunes.playlist.count(:each => :track)
     end
 
+    # cache (memory only) the persistent IDs
+    def ids
+      refresh unless @ids
+      @ids
+    end
   end
 
   # The music library
@@ -163,6 +172,10 @@ class Tunes < DelegateClass(Appscript::Application)
     end
   end
 
+  def playing
+    player_state.get == :playing
+  end
+
   # The location (for file tracks) or persistent_ID (for everything else)
   def loc(track)
     (track.location.get rescue track.persistent_ID.get).to_s
@@ -176,6 +189,7 @@ class IMMS
 
     # Try to connect to the UNIX socket, and failing that start immsd and try
     # again.
+    (HOME + '.imms').mkpath
     $log.info 'Connecting to immsd'
     begin
       @sock = UNIXSocket.open(HOME + '.imms' + 'socket')
@@ -205,7 +219,7 @@ class IMMS
     @sock.puts 'Version'
     version = @sock.gets.strip
     unless version == 'Version 2.1'
-      $log.warn "I'm not programmed for #{version}. Strange things may happen!" 
+      $log.warn "I'm not programmed for protocol #{version}. Strange things may happen!" 
     end
 
     @sock.puts 'IMMS'
@@ -250,7 +264,7 @@ class IMMS
 
         when 'PlaylistChanged'
           $log.warn 'immsd detected playlist change'
-          @tunes.cache.refresh true
+          @tunes.cache.refresh
           playlist_changed
 
         when 'GetPlaylistItem'
@@ -261,9 +275,9 @@ class IMMS
 
         when 'GetEntirePlaylist'
           $log.info 'Sending entire playlist...'
-          c = @tunes.cache.refresh
-          @tunes.playlist.tracks.persistent_ID.get.each_with_index do |id,pos|
-            @sock.puts "Playlist #{pos} #{c[id]}"
+          @tunes.cache.refresh
+          @tunes.cache.ids.each_with_index do |id,pos|
+            @sock.puts "Playlist #{pos} #{@tunes.cache[id]}"
           end
           @sock.puts "PlaylistEnd"
           $log.info 'done.'
@@ -281,7 +295,7 @@ class IMMS
     current_track = nil
     plays = 0
     fin = false
-    # If we happen to play a song not in the library playlist, we'll not tell
+    # If we happen to play a song not in the master playlist, we'll not tell
     # IMMS about it. (off the record)
     otr = false
     jumping = false
@@ -293,12 +307,9 @@ class IMMS
         next unless @tunes.running
 
         # Observe listening behavior
-
-        playing = (@tunes.player_state.get == :playing)
-
-        if playing
-          t = @tunes.current_track.get rescue next
-          controlling = @tunes.current_playlist.get == @tunes.queue.get
+        if @tunes.playing
+          t = @tunes.current_track.get
+          controlling = (@tunes.current_playlist.get == @tunes.queue.get)
           if not (@tunes.mute.get or idle)
             # advanced?
             if t != current_track
@@ -307,7 +318,7 @@ class IMMS
               end
               if current_track and not otr
                 if $verbose
-                  $log.info "#{fin ? "Finished" : "Skipped"} " + 
+                  $log.info "#{fin ? "Finished" : "Skipped"}" + 
                     "#{jumping ? " (jumping)" : ""}"
                 end
                 @sock.puts "EndSong #{fin ? 1 : 0} " + 
@@ -331,8 +342,7 @@ class IMMS
                 jumping = false
                 if i <= @tunes.queue.count(:each => :track) and @next
                   # we're jumping if the next track isn't the one we queued up
-                  jumping = (@tunes.queue.tracks[t.index.get + 1].get !=
-                             @next)
+                  jumping = (@tunes.queue.tracks[i].get != @next)
                 end
               end
 
@@ -368,20 +378,22 @@ class IMMS
   end
 end
 
-begin
-  imms = IMMS.new
-  dispatch = Thread.new do
-    imms.dispatch
-    raise "immsd connection lost"
+if __FILE__ == $0
+  begin
+    imms = IMMS.new
+    dispatch = Thread.new do
+      imms.dispatch
+      raise "immsd connection lost"
+    end
+    imms.control
+  rescue
+    $log.fatal $!
+    $log.info "Restarting"
+    dispatch.kill
+    imms.close
+    sleep 0.5
+    retry
   end
-  imms.control
-rescue
-  $log.fatal $!
-  $log.info "Restarting"
-  dispatch.kill
-  imms.close
-  sleep 0.5
-  retry
 end
 
 # This file is distributed under the Ruby License
