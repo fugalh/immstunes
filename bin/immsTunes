@@ -62,7 +62,8 @@ class Tunes < DelegateClass(Appscript::Application)
     def read
       if CacheFile.exist?
         $log.info "Reading cache"
-        h = ((YAML.load(CacheFile.read) rescue nil) or {})
+        h = (YAML.load(CacheFile.read) rescue nil)
+        h = {} unless Hash === h
         self.merge h
       end
       self
