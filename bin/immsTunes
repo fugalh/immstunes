@@ -88,18 +88,20 @@ class Tunes < DelegateClass(Appscript::Application)
         end
       else # it's usually faster to query just the persistent IDs
         $log.info "Refreshing cache"
-        ids.each do |id|
+        @ids.each do |id|
           unless self.has_key?(id)
-            t = @tunes.playlist.tracks[its.persistent_ID.eq(id)].get
+            t = @tunes.playlist.tracks[its.persistent_ID.eq(id)].first
+            $log.debug t.name.get
             self[id] = @tunes.loc(t)
             flag = true
           end
         end
       end
       # check for non-unique persistent IDs, because we're paranoid
-      if ids.uniq.size != ids.size
+      if @ids.uniq.size != @ids.size
         $log.warning "Non-unique persistent IDs found! Please contact me"
       end
+      p 'foo'
       write if flag
       self
     end
@@ -134,7 +136,7 @@ class Tunes < DelegateClass(Appscript::Application)
     fixed_indexing.set true
 
     # some playlist whose special kind is Music
-    @playlist = (@app.playlists['IMMS'] rescue 
+    @playlist = (@app.playlists['IMMS'].get rescue 
                  @app.playlists[its.special_kind.eq(:Music)].first)
     $log.info "Using playlist '#{@playlist.name.get}'"
 
@@ -368,8 +370,10 @@ class IMMS
   # close immsd connection so it gets SIGPIPE and goes away so we can restart
   def close
     @sock.close
-    Process.kill "INT", @immsd_pid
-    Process.wait @immsd_pid
+    if @immsd_pid
+      Process.kill "INT", @immsd_pid
+      Process.wait @immsd_pid
+    end
   end
 
   def idle
