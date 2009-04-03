@@ -1,3 +1,5 @@
+The danged thing keeps crashing. Make it more robust (at least able to restart itself).
+
 Use IMMS playlist if it exists, else Music playlist
     - update caching: cache (persistent_ID, location or nil) pairs (hash
       to yaml)
